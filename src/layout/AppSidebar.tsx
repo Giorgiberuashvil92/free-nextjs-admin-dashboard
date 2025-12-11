@@ -42,6 +42,29 @@ const navItems: NavItem[] = [
     name: "User Profile",
     path: "/profile",
   },
+  {
+    icon: <PieChartIcon />,
+    name: "Loyalty",
+    path: "/loyalty",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "Admin",
+    subItems: [
+      { name: "Users", path: "/users", pro: false },
+      { name: "Stories", path: "/stories", pro: false },
+      { name: "Health", path: "/health", pro: false },
+      { name: "Services", path: "/services", pro: false },
+      { name: "Mechanics", path: "/mechanics", pro: false },
+      { name: "Carwashes", path: "/carwashes", pro: false },
+      { name: "Financing Leads", path: "/financing-leads", pro: false },
+    ],
+  },
+  {
+    icon: <PlugInIcon />,
+    name: "Referrals",
+    path: "/referrals",
+  },
 
   {
     name: "Forms",

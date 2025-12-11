@@ -57,7 +57,12 @@ git clone https://github.com/TailAdmin/free-nextjs-admin-dashboard.git
     ```
     > Use `--legacy-peer-deps` flag if you face peer-dependency error during installation.
 
-2. Start the development server:
+2. Create `.env.local` in project root:
+   ```bash
+   echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:4000" > .env.local
+   ```
+
+3. Start the development server:
     ```bash
     npm run dev
     # or
