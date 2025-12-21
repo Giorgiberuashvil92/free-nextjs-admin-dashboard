@@ -494,7 +494,7 @@ export default function AutoServicesAdminPage() {
               <ImageUpload
                 value={form.images}
                 onChange={(urls) => setForm({ ...form, images: urls })}
-                multiple
+                maxImages={10}
               />
             </div>
 
