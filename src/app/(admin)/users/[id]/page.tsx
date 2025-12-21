@@ -66,6 +66,9 @@ export default function UserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [tokensLoading, setTokensLoading] = useState(false);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<UserDetail>>({});
 
   useEffect(() => {
     const loadUser = async () => {
@@ -82,6 +85,20 @@ export default function UserDetailPage() {
         const json = await res.json();
         const userData = json?.data || json;
         setUser(userData);
+        setEditForm({
+          firstName: userData.firstName || '',
+          lastName: userData.lastName || '',
+          email: userData.email || '',
+          phone: userData.phone || '',
+          role: userData.role || 'customer',
+          isActive: userData.isActive !== undefined ? userData.isActive : true,
+          address: userData.address || '',
+          city: userData.city || '',
+          country: userData.country || '',
+          zipCode: userData.zipCode || '',
+          dateOfBirth: userData.dateOfBirth || '',
+          gender: userData.gender || '',
+        });
       } catch (e) {
         console.error("Error loading user:", e);
         setError("მომხმარებლის ჩატვირთვა ვერ მოხერხდა");
@@ -215,16 +232,84 @@ export default function UserDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-            user.isActive 
-              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
-          }`}>
-            {user.isActive ? '✓ Active' : '✗ Inactive'}
-          </span>
-          <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-            {user.role}
-          </span>
+          {!editing ? (
+            <>
+              <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                user.isActive 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                  : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+              }`}>
+                {user.isActive ? '✓ Active' : '✗ Inactive'}
+              </span>
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                {user.role}
+              </span>
+              <button
+                onClick={() => setEditing(true)}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              >
+                ✏️ რედაქტირება
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const res = await fetch(`${API_BASE}/users/${id}`, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(editForm),
+                    });
+                    if (!res.ok) {
+                      const error = await res.json();
+                      throw new Error(error.message || 'Update failed');
+                    }
+                    const json = await res.json();
+                    setUser(json.data);
+                    setEditing(false);
+                    alert('✅ მომხმარებელი წარმატებით განახლდა');
+                  } catch (e) {
+                    console.error('Error updating user:', e);
+                    alert(`❌ შეცდომა: ${e instanceof Error ? e.message : 'Unknown error'}`);
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {saving ? 'შენახვა...' : '💾 შენახვა'}
+              </button>
+              <button
+                onClick={() => {
+                  setEditing(false);
+                  // Reset form to original user data
+                  if (user) {
+                    setEditForm({
+                      firstName: user.firstName || '',
+                      lastName: user.lastName || '',
+                      email: user.email || '',
+                      phone: user.phone || '',
+                      role: user.role || 'customer',
+                      isActive: user.isActive !== undefined ? user.isActive : true,
+                      address: user.address || '',
+                      city: user.city || '',
+                      country: user.country || '',
+                      zipCode: user.zipCode || '',
+                      dateOfBirth: user.dateOfBirth || '',
+                      gender: user.gender || '',
+                    });
+                  }
+                }}
+                disabled={saving}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                გაუქმება
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -240,26 +325,51 @@ export default function UserDetailPage() {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
           <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">კონტაქტი</h3>
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-400">📱</span>
-              <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">ტელეფონი</div>
-                <div className="font-medium text-gray-900 dark:text-white">{user.phone}</div>
-              </div>
-            </div>
-            {user.email && (
-              <div className="flex items-center gap-2">
-                <span className="text-gray-400">✉️</span>
+            {editing ? (
+              <>
                 <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Email</div>
-                  <a 
-                    className="font-medium text-blue-600 dark:text-blue-400 hover:underline" 
-                    href={`mailto:${user.email}`}
-                  >
-                    {user.email}
-                  </a>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">ტელეფონი</label>
+                  <input
+                    type="text"
+                    value={editForm.phone || ''}
+                    onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  />
                 </div>
-              </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Email</label>
+                  <input
+                    type="email"
+                    value={editForm.email || ''}
+                    onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-400">📱</span>
+                  <div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">ტელეფონი</div>
+                    <div className="font-medium text-gray-900 dark:text-white">{user.phone}</div>
+                  </div>
+                </div>
+                {user.email && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">✉️</span>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Email</div>
+                      <a 
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline" 
+                        href={`mailto:${user.email}`}
+                      >
+                        {user.email}
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -268,22 +378,54 @@ export default function UserDetailPage() {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
           <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">როლი და სტატუსი</h3>
           <div className="space-y-3">
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">როლი</div>
-              <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                {user.role}
-              </span>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">სტატუსი</div>
-              <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
-                user.isActive 
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
-              }`}>
-                {user.isActive ? '✓ Active' : '✗ Inactive'}
-              </span>
-            </div>
+            {editing ? (
+              <>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">როლი</label>
+                  <select
+                    value={editForm.role || 'customer'}
+                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  >
+                    <option value="customer">customer</option>
+                    <option value="owner">owner</option>
+                    <option value="manager">manager</option>
+                    <option value="employee">employee</option>
+                    <option value="user">user</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">სტატუსი</label>
+                  <select
+                    value={editForm.isActive ? 'true' : 'false'}
+                    onChange={(e) => setEditForm({ ...editForm, isActive: e.target.value === 'true' })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">როლი</div>
+                  <span className="inline-block px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                    {user.role}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">სტატუსი</div>
+                  <span className={`inline-block px-3 py-1 text-sm font-medium rounded-full ${
+                    user.isActive 
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
+                  }`}>
+                    {user.isActive ? '✓ Active' : '✗ Inactive'}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
@@ -312,10 +454,101 @@ export default function UserDetailPage() {
       </div>
 
       {/* Additional Info */}
-      {(user.address || user.city || user.country || user.dateOfBirth || user.gender) && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">დამატებითი ინფორმაცია</h2>
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">დამატებითი ინფორმაცია</h2>
+        {editing ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">სახელი</label>
+              <input
+                type="text"
+                value={editForm.firstName || ''}
+                onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">გვარი</label>
+              <input
+                type="text"
+                value={editForm.lastName || ''}
+                onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">მისამართი</label>
+              <input
+                type="text"
+                value={editForm.address || ''}
+                onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">ქალაქი</label>
+              <input
+                type="text"
+                value={editForm.city || ''}
+                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">ქვეყანა</label>
+              <input
+                type="text"
+                value={editForm.country || ''}
+                onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">ZIP კოდი</label>
+              <input
+                type="text"
+                value={editForm.zipCode || ''}
+                onChange={(e) => setEditForm({ ...editForm, zipCode: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">დაბადების თარიღი</label>
+              <input
+                type="date"
+                value={editForm.dateOfBirth || ''}
+                onChange={(e) => setEditForm({ ...editForm, dateOfBirth: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">სქესი</label>
+              <select
+                value={editForm.gender || ''}
+                onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              >
+                <option value="">აირჩიე</option>
+                <option value="male">კაცი</option>
+                <option value="female">ქალი</option>
+                <option value="other">სხვა</option>
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {user.firstName && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">სახელი</div>
+                <div className="font-medium text-gray-900 dark:text-white">{user.firstName}</div>
+              </div>
+            )}
+            {user.lastName && (
+              <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">გვარი</div>
+                <div className="font-medium text-gray-900 dark:text-white">{user.lastName}</div>
+              </div>
+            )}
             {user.address && (
               <div className="p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">მისამართი</div>
@@ -354,9 +587,14 @@ export default function UserDetailPage() {
                 <div className="font-medium text-gray-900 dark:text-white">{user.gender}</div>
               </div>
             )}
+            {!user.firstName && !user.lastName && !user.address && !user.city && !user.country && !user.zipCode && !user.dateOfBirth && !user.gender && (
+              <div className="col-span-full text-center py-8 text-gray-400 dark:text-gray-500">
+                დამატებითი ინფორმაცია არ არის
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* All User Data */}
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 shadow-sm">
