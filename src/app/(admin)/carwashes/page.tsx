@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import ImageUpload from "@/components/ImageUpload";
 
 type Carwash = {
   _id?: string;
@@ -18,7 +19,11 @@ type Carwash = {
   images?: string[];
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app";
+// Use proxy in development to avoid CORS issues
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? '/api/proxy' 
+  : BACKEND_URL;
 
 export default function CarwashesPage() {
   const [items, setItems] = useState<Carwash[]>([]);
@@ -27,10 +32,6 @@ export default function CarwashesPage() {
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [editing, setEditing] = useState<Carwash | null>(null);
   const [form, setForm] = useState<Partial<Carwash> & { images?: string[] }>({ name: "", address: "", phone: "", isOpen: true, waitTime: 0, images: [] });
-  const [uploading, setUploading] = useState(false);
-
-  const CLOUDINARY_URL = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_URL || "";
-  const CLOUDINARY_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "";
 
   useEffect(() => {
     const load = async () => {
@@ -205,43 +206,13 @@ export default function CarwashesPage() {
               </div>
 
               {/* Images */}
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-medium">Images</span>
-                  <label className="text-sm px-3 py-1.5 border rounded cursor-pointer">
-                    Upload
-                    <input type="file" multiple accept="image/*" className="hidden" onChange={async (e)=>{
-                      const files = Array.from(e.target.files||[]);
-                      if (!files.length || !CLOUDINARY_URL || !CLOUDINARY_PRESET) return;
-                      setUploading(true);
-                      try {
-                        const uploaded: string[] = [];
-                        for (const file of files) {
-                          const fd = new FormData();
-                          fd.append('file', file);
-                          fd.append('upload_preset', CLOUDINARY_PRESET);
-                          const r = await fetch(CLOUDINARY_URL, { method:'POST', body: fd });
-                          const j = await r.json();
-                          if (j?.secure_url) uploaded.push(j.secure_url as string);
-                        }
-                        setForm(f=>({...f, images:[...(f.images||[]), ...uploaded]}));
-                      } finally {
-                        setUploading(false);
-                      }
-                    }} />
-                  </label>
-                </div>
-                {uploading && <div className="text-sm text-gray-500 mt-1">Uploading…</div>}
-                <div className="mt-2 flex flex-wrap gap-3">
-                  {(form.images||[]).map((url,idx)=> (
-                    <div key={idx} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="carwash" className="w-24 h-24 object-cover rounded border" />
-                      <button className="absolute -top-2 -right-2 bg-white border rounded-full w-7 h-7 text-sm" onClick={()=>setForm(f=>({...f,images:(f.images||[]).filter((_,i)=>i!==idx)}))}>×</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <ImageUpload
+                value={form.images || []}
+                onChange={(urls) => setForm({ ...form, images: urls })}
+                maxImages={10}
+                folder="carwashes"
+                label="სურათები"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">

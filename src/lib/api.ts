@@ -1,4 +1,8 @@
-const API_BASE = "https://marte-backend-production.up.railway.app";
+const BACKEND_URL = "https://marte-backend-production.up.railway.app";
+// Use proxy in development to avoid CORS issues
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? '/api/proxy' 
+  : BACKEND_URL;
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
