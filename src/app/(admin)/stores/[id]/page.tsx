@@ -4,6 +4,16 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 
+const STORE_TYPES = [
+  "მაღაზია",
+  "ნაწილები",
+  "დაშლილები",
+  "ზეთები",
+  "ხელოსნები",
+  "ავტოსერვისები",
+  "ევაკუატორი"
+];
+
 type StoreDetail = {
   id?: string;
   _id?: string;
@@ -253,10 +263,11 @@ export default function StoreDetailPage() {
                   onChange={(e) => setData({ ...data, type: e.target.value })}
                 >
                   <option value="">აირჩიეთ</option>
-                  <option value="ავტონაწილები">ავტონაწილები</option>
-                  <option value="სამართ-დასახურებელი">სამართ-დასახურებელი</option>
-                  <option value="რემონტი">რემონტი</option>
-                  <option value="სხვა">სხვა</option>
+                  {STORE_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dtj9xx4qu";
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "carxapp";
@@ -23,6 +23,7 @@ export default function ImageUpload({
 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState("");
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uploadToCloudinary = async (file: File): Promise<string | null> => {
@@ -91,6 +92,59 @@ export default function ImageUpload({
     onChange(newUrls);
   };
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      const files = e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+
+      const remainingSlots = maxImages - value.length;
+      if (remainingSlots <= 0) {
+        alert(`მაქსიმუმ ${maxImages} სურათის ატვირთვა შეგიძლიათ`);
+        return;
+      }
+
+      const filesToUpload = Array.from(files).slice(0, remainingSlots).filter((f) => f.type.startsWith("image/"));
+      if (filesToUpload.length === 0) {
+        alert("გთხოვთ ატვირთოთ მხოლოდ სურათები");
+        return;
+      }
+
+      setUploading(true);
+      setUploadProgress("სურათების ატვირთვა...");
+
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < filesToUpload.length; i++) {
+        setUploadProgress(`ატვირთვა ${i + 1}/${filesToUpload.length}...`);
+        const url = await uploadToCloudinary(filesToUpload[i]);
+        if (url) {
+          uploadedUrls.push(url);
+        }
+      }
+
+      setUploading(false);
+      setUploadProgress("");
+      onChange([...value, ...uploadedUrls]);
+    },
+    [value, maxImages, onChange]
+  );
+
   return (
     <div className="space-y-3">
       <label className="block text-sm font-medium">{label}</label>
@@ -114,7 +168,16 @@ export default function ImageUpload({
         ))}
 
         {value.length < maxImages && (
-          <label className="w-24 h-24 border-2 border-dashed border-gray-300 rounded flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors">
+          <label
+            className={`w-24 h-24 border-2 border-dashed rounded flex items-center justify-center cursor-pointer transition-colors ${
+              isDragging
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400"
+            }`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -133,6 +196,7 @@ export default function ImageUpload({
               <div className="text-center text-gray-400">
                 <div className="text-2xl mb-1">+</div>
                 <div className="text-xs">დამატება</div>
+                <div className="text-xs mt-1">ან გადაიტანე</div>
               </div>
             )}
           </label>
@@ -147,4 +211,5 @@ export default function ImageUpload({
     </div>
   );
 }
+
 

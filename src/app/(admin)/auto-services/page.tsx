@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiGetJson, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import ImageUpload from "@/components/ImageUpload";
@@ -31,24 +32,8 @@ type Service = {
 const DEFAULT_CATEGORIES = ["ავტოსერვისი", "სამრეცხაო", "დეტეილინგი", "სხვა"];
 const LOCATIONS = ["თბილისი", "ბათუმი", "ქუთაისი", "რუსთავი", "გორი", "ზუგდიდი", "ფოთი", "ახალქალაქი", "ოზურგეთი", "ტყიბული", "სხვა"];
 const STATUSES = ["active", "inactive", "pending"];
-const AVAILABLE_SERVICES = [
-  "ძრავის შეკეთება",
-  "ტრანსმისიის შეკეთება",
-  "ფარების შეკეთება",
-  "საბურავების შეცვლა",
-  "ბლოკ-ფარების შეკეთება",
-  "ინტერიერის შეკეთება",
-  "ელექტრონიკის შეკეთება",
-  "ჰიდრავლიკის შეკეთება",
-  "საბურავების დაბალანსება",
-  "საწვავის სისტემის შეკეთება",
-  "გაგრილების სისტემის შეკეთება",
-  "საბრეიკო სისტემის შეკეთება",
-  "საბურავების შეკეთება",
-  "სხვა"
-];
 
-export default function ServicesAdminPage() {
+export default function AutoServicesAdminPage() {
   const [services, setServices] = useState<Service[]>([]);
   const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(false);
@@ -67,7 +52,7 @@ export default function ServicesAdminPage() {
     reviews: "",
     images: [] as string[],
     avatar: "",
-    services: [] as string[],
+    services: "",
     features: "",
     isOpen: true,
     waitTime: "",
@@ -144,7 +129,7 @@ export default function ServicesAdminPage() {
       if (form.rating) payload.rating = parseFloat(form.rating);
       if (form.reviews) payload.reviews = parseInt(form.reviews);
       if (form.avatar) payload.avatar = form.avatar;
-      if (form.services && form.services.length > 0) payload.services = form.services;
+      if (form.services) payload.services = form.services.split(',').map(s => s.trim()).filter(Boolean);
       if (form.features) payload.features = form.features;
       if (form.waitTime) payload.waitTime = form.waitTime;
       if (form.workingHours) payload.workingHours = form.workingHours;
@@ -169,7 +154,7 @@ export default function ServicesAdminPage() {
         reviews: "",
         images: [],
         avatar: "",
-        services: [] as string[],
+        services: "",
         features: "",
         isOpen: true,
         waitTime: "",
@@ -199,7 +184,7 @@ export default function ServicesAdminPage() {
       reviews: service.reviews?.toString() || "",
       images: service.images || [],
       avatar: service.avatar || "",
-      services: service.services || [],
+      services: service.services?.join(', ') || "",
       features: service.features || "",
       isOpen: service.isOpen ?? true,
       waitTime: service.waitTime || "",
@@ -243,7 +228,7 @@ export default function ServicesAdminPage() {
               reviews: "",
               images: [],
               avatar: "",
-              services: [] as string[],
+              services: "",
               features: "",
               isOpen: true,
               waitTime: "",
@@ -392,41 +377,17 @@ export default function ServicesAdminPage() {
                 />
               </div>
 
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-2">
-                  სერვისები
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  სერვისები (მძიმით გამოყოფილი)
                 </label>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto border rounded p-3">
-                  {AVAILABLE_SERVICES.map((service) => (
-                    <label key={service} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={form.services.includes(service)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setForm({ ...form, services: [...form.services, service] });
-                          } else {
-                            setForm({ ...form, services: form.services.filter(s => s !== service) });
-                          }
-                        }}
-                        className="rounded"
-                      />
-                      <span className="text-sm text-gray-700">{service}</span>
-                    </label>
-                  ))}
-                </div>
-                {form.services.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {form.services.map((service) => (
-                      <span
-                        key={service}
-                        className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs"
-                      >
-                        {service}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <input
+                  type="text"
+                  className="w-full border rounded px-3 py-2"
+                  value={form.services}
+                  onChange={(e) => setForm({ ...form, services: e.target.value })}
+                  placeholder="სერვისი 1, სერვისი 2, ..."
+                />
               </div>
 
               <div>
@@ -533,16 +494,17 @@ export default function ServicesAdminPage() {
               <ImageUpload
                 value={form.images}
                 onChange={(urls) => setForm({ ...form, images: urls })}
+                multiple
               />
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-4">
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-black text-white rounded disabled:opacity-50"
+                className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {loading ? "შენახვა..." : editingId ? "განახლება" : "დამატება"}
+                {loading ? "ინახება..." : editingId ? "განახლება" : "დამატება"}
               </button>
               <button
                 type="button"
@@ -550,7 +512,7 @@ export default function ServicesAdminPage() {
                   setShowForm(false);
                   setEditingId(null);
                 }}
-                className="px-4 py-2 border rounded"
+                className="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400"
               >
                 გაუქმება
               </button>
@@ -561,82 +523,65 @@ export default function ServicesAdminPage() {
 
       {loading && !showForm ? (
         <div className="text-center py-8">იტვირთება...</div>
-      ) : services.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          სერვისები არ არის
-        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {services.map((service) => (
-            <div key={service.id} className="bg-white border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-              {service.images && service.images.length > 0 ? (
-                <img
-                  src={service.images[0]}
-                  alt={service.name}
-                  className="w-full h-48 object-cover"
-                />
-              ) : (
-                <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-400">სურათი არ არის</span>
-                </div>
-              )}
-              <div className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{service.name}</h3>
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    service.status === 'active' ? 'bg-green-100 text-green-800' :
-                    service.status === 'inactive' ? 'bg-red-100 text-red-800' :
-                    'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {service.status}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">{service.category}</p>
-                <p className="text-sm text-gray-500 mb-2">
-                  <span className="font-medium">ლოკაცია:</span> {service.location}
-                </p>
-                {service.address && (
-                  <p className="text-sm text-gray-500 mb-2">
-                    <span className="font-medium">მისამართი:</span> {service.address}
-                  </p>
-                )}
-                {service.phone && (
-                  <p className="text-sm text-gray-500 mb-2">
-                    <span className="font-medium">ტელეფონი:</span> {service.phone}
-                  </p>
-                )}
-                {service.price && (
-                  <p className="text-sm font-semibold text-gray-900 mb-2">
-                    ფასი: {service.price}
-                  </p>
-                )}
-                {service.rating && (
-                  <p className="text-sm text-gray-500 mb-2">
-                    <span className="font-medium">რეიტინგი:</span> {service.rating} ⭐
-                  </p>
-                )}
-                {service.description && (
-                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">{service.description}</p>
-            )}
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => handleEdit(service)}
-                    className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
-                  >
-                    რედაქტირება
-                  </button>
-                  <button
-                    onClick={() => handleDelete(service.id || "")}
-                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                  >
-                    წაშლა
-                  </button>
-                </div>
-              </div>
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">სახელი</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">კატეგორია</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ლოკაცია</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ტელეფონი</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">ფასი</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">სტატუსი</th>
+                <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">მოქმედებები</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {services.map((service) => (
+                <tr key={service.id}>
+                  <td className="px-4 py-3 text-sm">{service.name}</td>
+                  <td className="px-4 py-3 text-sm">{service.category}</td>
+                  <td className="px-4 py-3 text-sm">{service.location}</td>
+                  <td className="px-4 py-3 text-sm">{service.phone}</td>
+                  <td className="px-4 py-3 text-sm">{service.price || '-'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      service.status === 'active' ? 'bg-green-100 text-green-800' :
+                      service.status === 'inactive' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {service.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(service)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        რედაქტირება
+                      </button>
+                      <button
+                        onClick={() => handleDelete(service.id || "")}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        წაშლა
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {services.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              სერვისები არ არის
             </div>
-          ))}
-      </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
+

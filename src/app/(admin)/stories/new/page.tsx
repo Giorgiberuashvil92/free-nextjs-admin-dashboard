@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { apiPost } from "@/lib/api";
+import ImageUpload from "@/components/ImageUpload";
 
 type Item = { id: string; type: "image" | "video"; uri: string; durationMs?: number; caption?: string };
 
@@ -83,12 +84,36 @@ export default function NewStoryPage() {
             <input className="border rounded px-3 py-2 w-full" value={authorName} onChange={(e)=>setAuthorName(e.target.value)} placeholder="display name" />
           </div>
           <div>
-            <div className="text-sm text-gray-600">Author avatar (URL)</div>
-            <input className="border rounded px-3 py-2 w-full" value={authorAvatar} onChange={(e)=>setAuthorAvatar(e.target.value)} placeholder="https://..." />
+            <div className="text-sm text-gray-600 mb-2">Author avatar (URL) ან ატვირთე ფოტო</div>
+            <ImageUpload
+              value={authorAvatar ? [authorAvatar] : []}
+              onChange={(urls) => setAuthorAvatar(urls.length > 0 ? urls[0] : "")}
+              maxImages={1}
+              folder="stories"
+              label=""
+            />
+            <input 
+              className="border rounded px-3 py-2 w-full mt-2" 
+              value={authorAvatar} 
+              onChange={(e)=>setAuthorAvatar(e.target.value)} 
+              placeholder="ან შეიყვანე URL ხელით" 
+            />
           </div>
           <div>
-            <div className="text-sm text-gray-600">Internal Image (URL)</div>
-            <input className="border rounded px-3 py-2 w-full" value={internalImage} onChange={(e)=>setInternalImage(e.target.value)} placeholder="https://..." />
+            <div className="text-sm text-gray-600 mb-2">Internal Image (URL) ან ატვირთე ფოტო</div>
+            <ImageUpload
+              value={internalImage ? [internalImage] : []}
+              onChange={(urls) => setInternalImage(urls.length > 0 ? urls[0] : "")}
+              maxImages={1}
+              folder="stories"
+              label=""
+            />
+            <input 
+              className="border rounded px-3 py-2 w-full mt-2" 
+              value={internalImage} 
+              onChange={(e)=>setInternalImage(e.target.value)} 
+              placeholder="ან შეიყვანე URL ხელით" 
+            />
           </div>
           <div className="flex gap-3">
             <div>
@@ -123,7 +148,37 @@ export default function NewStoryPage() {
                   <button className="px-2 py-1 border rounded" disabled={idx===items.length-1} onClick={()=>moveItem(it.id, 1)}>↓</button>
                   <button className="ml-auto px-2 py-1 border rounded text-red-600" onClick={()=>removeItem(it.id)}>Remove</button>
                 </div>
-                <input className="border rounded px-3 py-2 w-full" placeholder={it.type==='image'?"Image URL":"Video URL"} value={it.uri} onChange={(e)=>updateItem(it.id, { uri: e.target.value })} />
+                {it.type === 'image' ? (
+                  <div>
+                    <div className="text-sm text-gray-600 mb-2">Image URL ან ატვირთე ფოტო</div>
+                    <ImageUpload
+                      value={it.uri ? [it.uri] : []}
+                      onChange={(urls) => {
+                        if (urls.length > 0) {
+                          updateItem(it.id, { uri: urls[0] });
+                        } else {
+                          updateItem(it.id, { uri: "" });
+                        }
+                      }}
+                      maxImages={1}
+                      folder="stories"
+                      label=""
+                    />
+                    <input 
+                      className="border rounded px-3 py-2 w-full mt-2" 
+                      placeholder="ან შეიყვანე URL ხელით" 
+                      value={it.uri} 
+                      onChange={(e)=>updateItem(it.id, { uri: e.target.value })} 
+                    />
+                  </div>
+                ) : (
+                  <input 
+                    className="border rounded px-3 py-2 w-full" 
+                    placeholder="Video URL" 
+                    value={it.uri} 
+                    onChange={(e)=>updateItem(it.id, { uri: e.target.value })} 
+                  />
+                )}
                 <input className="border rounded px-3 py-2 w-full" placeholder="Duration (ms)" type="number" value={it.durationMs ?? 6000} onChange={(e)=>updateItem(it.id, { durationMs: Number(e.target.value || 0) })} />
                 <textarea className="border rounded px-3 py-2 w-full" placeholder="Caption" value={it.caption || ""} onChange={(e)=>updateItem(it.id, { caption: e.target.value })} />
               </div>

@@ -20,12 +20,14 @@ type Part = {
   createdAt?: string;
 };
 
-const CATEGORIES = ["ძრავა", "ტრანსმისია", "ფარები", "საბურავები", "ბლოკ-ფარები", "ინტერიერი", "ელექტრონიკა", "სხვა"];
+// Fallback კატეგორიები
+const DEFAULT_CATEGORIES = ["ძრავა", "ტრანსმისია", "ფარები", "საბურავები", "ბლოკ-ფარები", "ინტერიერი", "ელექტრონიკა", "სხვა"];
 const CONDITIONS = ["ახალი", "ძალიან კარგი", "კარგი", "დამაკმაყოფილებელი"];
 const LOCATIONS = ["თბილისი", "ბათუმი", "ქუთაისი", "რუსთავი", "გორი", "ზუგდიდი", "ფოთი", "ახალქალაქი", "ოზურგეთი", "ტყიბული", "სხვა"];
 
 export default function PartsAdminPage() {
   const [parts, setParts] = useState<Part[]>([]);
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -64,9 +66,29 @@ export default function PartsAdminPage() {
   };
 
   useEffect(() => {
+    loadCategories();
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const res = await apiGetJson<{ success: boolean; data: any[] }>("/categories");
+      const allCategories = res.success ? res.data : [];
+      // Find parts category or categories with 'part' in serviceTypes
+      const partsCategories = allCategories.filter(
+        (cat: any) => cat.serviceTypes?.includes("part") || cat.nameEn?.toLowerCase().includes("part")
+      );
+      
+      if (partsCategories.length > 0) {
+        // Use category names from API
+        setCategories(partsCategories.map((cat: any) => cat.name));
+      }
+    } catch (e) {
+      // Keep default categories on error
+      console.error("Error loading categories:", e);
+    }
+  };
 
   const normalizePhone = (phone: string) => {
     if (!phone) return "";
@@ -247,7 +269,7 @@ export default function PartsAdminPage() {
                   required
                 >
                   <option value="">აირჩიეთ კატეგორია</option>
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <option key={cat} value={cat}>
                       {cat}
                     </option>

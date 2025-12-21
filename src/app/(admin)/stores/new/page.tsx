@@ -5,7 +5,15 @@ import { useRouter } from "next/navigation";
 import { apiPost } from "@/lib/api";
 import ImageUpload from "@/components/ImageUpload";
 
-const STORE_TYPES = ["ავტონაწილები", "სამართ-დასახურებელი", "რემონტი", "სხვა"];
+const STORE_TYPES = [
+  "მაღაზიები",
+  "ნაწილები",
+  "დაშლილები",
+  "ზეთები",
+  "ხელოსნები",
+  "ავტოსერვისები",
+  "ევაკუატორი"
+];
 const LOCATIONS = ["თბილისი", "ბათუმი", "ქუთაისი", "რუსთავი", "გორი", "ზუგდიდი", "ფოთი", "ახალქალაქი", "ოზურგეთი", "ტყიბული", "სხვა"];
 
 export default function NewStorePage() {

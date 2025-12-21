@@ -47,13 +47,15 @@ const navItems: NavItem[] = [
     name: "Loyalty",
     path: "/loyalty",
   },
-  {
+    {
     icon: <PieChartIcon />,
     name: "Admin",
     subItems: [
+      { name: "Analytics", path: "/analytics", pro: false },
       { name: "Users", path: "/users", pro: false },
       { name: "Stories", path: "/stories", pro: false },
       { name: "Health", path: "/health", pro: false },
+      { name: "Categories", path: "/categories", pro: false },
       { name: "Services", path: "/services", pro: false },
       { name: "Mechanics", path: "/mechanics", pro: false },
       { name: "Carwashes", path: "/carwashes", pro: false },
@@ -61,6 +63,7 @@ const navItems: NavItem[] = [
       { name: "Parts", path: "/parts", pro: false },
       { name: "Dismantlers", path: "/dismantlers", pro: false },
       { name: "Financing Leads", path: "/financing-leads", pro: false },
+      { name: "Login History", path: "/login-history", pro: false },
     ],
   },
   {
