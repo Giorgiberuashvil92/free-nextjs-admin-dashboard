@@ -70,6 +70,33 @@ export default function UsersPage() {
     }
   };
 
+  const handleDelete = async (userId: string, userName: string) => {
+    if (!confirm(`ნამდვილად გსურთ ${userName || userId} user-ის წაშლა?`)) {
+      return;
+    }
+
+    try {
+      const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+        ? '/api/proxy' 
+        : (process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app");
+      
+      const res = await fetch(`${API_BASE}/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Failed to delete user');
+      }
+
+      alert('✅ User წარმატებით წაიშალა!');
+      load(); // Reload the list
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       setLoading(true); setErr("");
@@ -384,6 +411,7 @@ export default function UsersPage() {
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Devices</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Created</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Updated</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -464,6 +492,15 @@ export default function UsersPage() {
                         <div className="text-gray-500 dark:text-gray-400">{new Date(u.updatedAt).toLocaleTimeString('ka-GE', { hour: '2-digit', minute: '2-digit' })}</div>
                       </div>
                     ) : '-'}
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => handleDelete(u.id, [u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}
+                      className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg transition-colors"
+                      title="Delete user"
+                    >
+                      🗑️ წაშლა
+                    </button>
                   </td>
                 </tr>
                 {expandedRows.has(u.id) && (

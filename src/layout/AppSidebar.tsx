@@ -5,17 +5,11 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
-  BoxCubeIcon,
-  CalenderIcon,
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
-  PageIcon,
   PieChartIcon,
   PlugInIcon,
-  TableIcon,
-  UserCircleIcon,
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 
@@ -29,99 +23,102 @@ type NavItem = {
 const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
-    name: "Dashboard",
-    subItems: [{ name: "Ecommerce", path: "/", pro: false }],
-  },
-  {
-    icon: <CalenderIcon />,
-    name: "Calendar",
-    path: "/calendar",
-  },
-  {
-    icon: <UserCircleIcon />,
-    name: "User Profile",
-    path: "/profile",
+    name: "მთავარი",
+    path: "/",
   },
   {
     icon: <PieChartIcon />,
-    name: "Loyalty",
+    name: "ანალიტიკა",
+    path: "/analytics",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "მომხმარებლები",
+    path: "/users",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "სტორიები",
+    path: "/stories",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "კატეგორიები",
+    path: "/categories",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "სერვისები",
+    path: "/services",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ავტო სერვისები",
+    path: "/auto-services",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "მექანიკოსები",
+    path: "/mechanics",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ავტოსამრეცხაოები",
+    path: "/carwashes",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "მანქანების გაქირავება",
+    path: "/car-rentals",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "მაღაზიები",
+    path: "/stores",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ნაწილები",
+    path: "/parts",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "დაშლილები",
+    path: "/dismantlers",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "შეხსენებები & შეთავაზებები",
+    path: "/reminders-offers",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "დაფინანსების მოთხოვნები",
+    path: "/financing-leads",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ლოიალობა",
     path: "/loyalty",
   },
-    {
-    icon: <PieChartIcon />,
-    name: "Admin",
-    subItems: [
-      { name: "Analytics", path: "/analytics", pro: false },
-      { name: "Users", path: "/users", pro: false },
-      { name: "Stories", path: "/stories", pro: false },
-      { name: "Health", path: "/health", pro: false },
-      { name: "Categories", path: "/categories", pro: false },
-      { name: "Services", path: "/services", pro: false },
-      { name: "Mechanics", path: "/mechanics", pro: false },
-      { name: "Carwashes", path: "/carwashes", pro: false },
-      { name: "Stores", path: "/stores", pro: false },
-      { name: "Parts", path: "/parts", pro: false },
-      { name: "Dismantlers", path: "/dismantlers", pro: false },
-      { name: "Financing Leads", path: "/financing-leads", pro: false },
-      { name: "Login History", path: "/login-history", pro: false },
-    ],
-  },
   {
     icon: <PlugInIcon />,
-    name: "Referrals",
+    name: "რეფერალები",
     path: "/referrals",
   },
-
-  {
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-  },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  },
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Blank Page", path: "/blank", pro: false },
-      { name: "404 Error", path: "/error-404", pro: false },
-    ],
-  },
-];
-
-const othersItems: NavItem[] = [
   {
     icon: <PieChartIcon />,
-    name: "Charts",
-    subItems: [
-      { name: "Line Chart", path: "/line-chart", pro: false },
-      { name: "Bar Chart", path: "/bar-chart", pro: false },
-    ],
+    name: "ჯანმრთელობა",
+    path: "/health",
   },
   {
-    icon: <BoxCubeIcon />,
-    name: "UI Elements",
-    subItems: [
-      { name: "Alerts", path: "/alerts", pro: false },
-      { name: "Avatar", path: "/avatars", pro: false },
-      { name: "Badge", path: "/badge", pro: false },
-      { name: "Buttons", path: "/buttons", pro: false },
-      { name: "Images", path: "/images", pro: false },
-      { name: "Videos", path: "/videos", pro: false },
-    ],
-  },
-  {
-    icon: <PlugInIcon />,
-    name: "Authentication",
-    subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-      { name: "Sign Up", path: "/signup", pro: false },
-    ],
+    icon: <PieChartIcon />,
+    name: "შესვლის ისტორია",
+    path: "/login-history",
   },
 ];
+
+const othersItems: NavItem[] = [];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -377,29 +374,12 @@ const AppSidebar: React.FC = () => {
                 }`}
               >
                 {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
+                  "მენიუ"
                 ) : (
                   <HorizontaLDots />
                 )}
               </h2>
               {renderMenuItems(navItems, "main")}
-            </div>
-
-            <div className="">
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Others"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
-              {renderMenuItems(othersItems, "others")}
             </div>
           </div>
         </nav>
