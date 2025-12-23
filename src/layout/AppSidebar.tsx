@@ -116,6 +116,11 @@ const navItems: NavItem[] = [
     name: "შესვლის ისტორია",
     path: "/login-history",
   },
+  {
+    icon: <PieChartIcon />,
+    name: "საბსქრიფშენები",
+    path: "/subscriptions",
+  },
 ];
 
 const othersItems: NavItem[] = [];
