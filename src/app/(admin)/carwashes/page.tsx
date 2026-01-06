@@ -17,6 +17,8 @@ type Carwash = {
   price?: number;
   detailedServices?: { id: string; name: string; price: number; duration: number; description?: string }[];
   images?: string[];
+  latitude?: number;
+  longitude?: number;
 };
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app";
@@ -31,7 +33,7 @@ export default function CarwashesPage() {
   const [loading, setLoading] = useState(false);
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [editing, setEditing] = useState<Carwash | null>(null);
-  const [form, setForm] = useState<Partial<Carwash> & { images?: string[] }>({ name: "", address: "", phone: "", isOpen: true, waitTime: 0, images: [] });
+  const [form, setForm] = useState<Partial<Carwash> & { images?: string[] }>({ name: "", address: "", phone: "", isOpen: true, waitTime: 0, images: [], latitude: undefined, longitude: undefined });
 
   useEffect(() => {
     const load = async () => {
@@ -170,7 +172,7 @@ export default function CarwashesPage() {
       {/* Add / Edit Button */}
       <div className="mt-4">
         <button
-          onClick={() => { setEditing(null); setForm({ name: "", address: "", phone: "", isOpen: true, waitTime: 0, images: [] }); setIsOpenModal(true); }}
+          onClick={() => { setEditing(null); setForm({ name: "", address: "", phone: "", isOpen: true, waitTime: 0, images: [], latitude: undefined, longitude: undefined }); setIsOpenModal(true); }}
           className="px-4 py-2 text-base rounded border hover:bg-gray-50"
         >
           + Add Carwash
@@ -204,6 +206,14 @@ export default function CarwashesPage() {
                   <input type="number" className="ml-2 w-28 border rounded px-3 py-2" value={typeof form.waitTime === 'number' ? form.waitTime : 0} onChange={(e)=>setForm(f=>({...f,waitTime: Number(e.target.value||0)}))} />
                 </label>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="text-base">Latitude
+                  <input type="number" step="any" className="mt-1 w-full border rounded px-3 py-2" value={form.latitude || ''} onChange={(e)=>setForm(f=>({...f,latitude: e.target.value ? parseFloat(e.target.value) : undefined}))} placeholder="41.7151" />
+                </label>
+                <label className="text-base">Longitude
+                  <input type="number" step="any" className="mt-1 w-full border rounded px-3 py-2" value={form.longitude || ''} onChange={(e)=>setForm(f=>({...f,longitude: e.target.value ? parseFloat(e.target.value) : undefined}))} placeholder="44.8271" />
+                </label>
+              </div>
 
               {/* Images */}
               <ImageUpload
@@ -228,6 +238,8 @@ export default function CarwashesPage() {
                     isOpen: !!form.isOpen,
                     // Backend schema expects many extra fields; we send minimum and let backend defaults/validators handle or adjust as needed
                     images: form.images || [],
+                    latitude: form.latitude,
+                    longitude: form.longitude,
                   };
                   if (editing) {
                     await fetch(`${API_BASE}/carwash/locations/${editing.id || editing._id}`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiGetJson, apiPost } from "@/lib/api";
+import { apiGetJson, apiPost, apiDelete, apiPatch } from "@/lib/api";
 import ImageUpload from "@/components/ImageUpload";
 
 type Dismantler = {
@@ -26,6 +26,7 @@ export default function DismantlersAdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState<Dismantler | null>(null);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -56,7 +57,6 @@ export default function DismantlersAdminPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const normalizePhone = (phone: string) => {
@@ -89,7 +89,11 @@ export default function DismantlersAdminPage() {
         description: form.description.trim() || undefined,
         photos: form.photos.filter(Boolean),
       };
-      await apiPost("/dismantlers", payload);
+      if (editing?.id) {
+        await apiPatch(`/dismantlers/${editing.id}`, payload);
+      } else {
+        await apiPost("/dismantlers", payload);
+      }
       setForm({
         name: "",
         phone: "",
@@ -101,10 +105,46 @@ export default function DismantlersAdminPage() {
         description: "",
         photos: [],
       });
+      setEditing(null);
       setShowForm(false);
       await load();
     } catch (e: unknown) {
-      const msg = e && typeof e === "object" && "message" in e ? String((e as { message?: string }).message) : "შეცდომა დაშლილების დამატებისას";
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message?: string }).message) : editing ? "შეცდომა დაშლილის რედაქტირებისას" : "შეცდომა დაშლილების დამატებისას";
+      setError(msg);
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (dismantler: Dismantler) => {
+    setEditing(dismantler);
+    setForm({
+      name: dismantler.name || "",
+      phone: dismantler.phone || "",
+      brand: dismantler.brand || "",
+      model: dismantler.model || "",
+      yearFrom: String(dismantler.yearFrom || ""),
+      yearTo: String(dismantler.yearTo || ""),
+      location: dismantler.location || "",
+      description: dismantler.description || "",
+      photos: dismantler.photos || [],
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!id) return;
+    if (!confirm("დარწმუნებული ხართ რომ გსურთ ამ დაშლილის წაშლა?")) {
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await apiDelete(`/dismantlers/${id}`);
+      await load();
+    } catch (e: unknown) {
+      const msg = e && typeof e === "object" && "message" in e ? String((e as { message?: string }).message) : "შეცდომა დაშლილის წაშლისას";
       setError(msg);
       console.error(e);
     } finally {
@@ -121,7 +161,21 @@ export default function DismantlersAdminPage() {
         </div>
         <button
           className="px-4 py-2 bg-black text-white rounded"
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setEditing(null);
+            setForm({
+              name: "",
+              phone: "",
+              brand: "",
+              model: "",
+              yearFrom: "",
+              yearTo: "",
+              location: "",
+              description: "",
+              photos: [],
+            });
+            setShowForm(!showForm);
+          }}
         >
           {showForm ? "დახურვა" : "ახალი დაშლილი"}
         </button>
@@ -131,7 +185,7 @@ export default function DismantlersAdminPage() {
 
       {showForm && (
         <div className="border rounded-lg p-6 bg-white">
-          <h2 className="text-xl font-semibold mb-4">ახალი დაშლილების განცხადება</h2>
+          <h2 className="text-xl font-semibold mb-4">{editing ? "დაშლილის რედაქტირება" : "ახალი დაშლილების განცხადება"}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -271,7 +325,21 @@ export default function DismantlersAdminPage() {
               <button
                 type="button"
                 className="px-4 py-2 border rounded"
-                onClick={() => setShowForm(false)}
+                onClick={() => {
+                  setShowForm(false);
+                  setEditing(null);
+                  setForm({
+                    name: "",
+                    phone: "",
+                    brand: "",
+                    model: "",
+                    yearFrom: "",
+                    yearTo: "",
+                    location: "",
+                    description: "",
+                    photos: [],
+                  });
+                }}
               >
                 გაუქმება
               </button>
@@ -280,57 +348,72 @@ export default function DismantlersAdminPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto border rounded-md">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 py-2 text-left">ID</th>
-              <th className="px-3 py-2 text-left">გამყიდველი</th>
-              <th className="px-3 py-2 text-left">ბრენდი/მოდელი</th>
-              <th className="px-3 py-2 text-left">წლები</th>
-              <th className="px-3 py-2 text-left">ქალაქი</th>
-              <th className="px-3 py-2 text-left">ტელეფონი</th>
-              <th className="px-3 py-2 text-left">შექმნილია</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td className="px-3 py-8 text-center text-gray-500" colSpan={7}>
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {!loading && dismantlers.length === 0 && (
-              <tr>
-                <td className="px-3 py-8 text-center text-gray-500" colSpan={7}>
-                  No dismantlers
-                </td>
-              </tr>
-            )}
-            {dismantlers.map((d) => (
-              <tr key={d.id} className="border-t">
-                <td className="px-3 py-2">
-                  <a className="text-blue-600 underline" href={`/dismantlers/${d.id}`}>
-                    {d.id?.substring(0, 8)}...
-                  </a>
-                </td>
-                <td className="px-3 py-2">{d.name || "-"}</td>
-                <td className="px-3 py-2">
-                  {d.brand || "-"} {d.model ? `/ ${d.model}` : ""}
-                </td>
-                <td className="px-3 py-2">
-                  {d.yearFrom || "-"} - {d.yearTo || "-"}
-                </td>
-                <td className="px-3 py-2">{d.location || "-"}</td>
-                <td className="px-3 py-2">{d.phone || "-"}</td>
-                <td className="px-3 py-2">
-                  {d.createdAt ? new Date(d.createdAt).toLocaleString() : "-"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {loading ? (
+          <div className="col-span-full text-center text-gray-500 py-10">იტვირთება...</div>
+        ) : dismantlers.length === 0 ? (
+          <div className="col-span-full text-center text-gray-500 py-10">დაშლილები არ არის</div>
+        ) : (
+          dismantlers.map((d) => {
+            const img = d.photos?.[0];
+            return (
+              <div key={d.id} className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+                {img ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={img} alt="cover" className="w-full h-40 object-cover" />
+                ) : (
+                  <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400">სურათი არ არის</div>
+                )}
+                <div className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold">{d.name || "-"}</h3>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {d.brand || "-"} {d.model ? `/ ${d.model}` : ""}
+                      </div>
+                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">{d.location || "-"}</span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2 py-0.5 rounded bg-gray-100 border">
+                      წლები: {d.yearFrom || "-"} - {d.yearTo || "-"}
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-gray-100 border">
+                      ტელ: {d.phone || "-"}
+                    </span>
+                  </div>
+
+                  {d.description && (
+                    <p className="text-sm text-gray-600 line-clamp-2">{d.description}</p>
+                  )}
+
+                  {d.createdAt && (
+                    <div className="text-xs text-gray-500">
+                      შექმნილია: {new Date(d.createdAt).toLocaleDateString()}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      className="flex-1 text-sm px-3 py-1.5 border rounded hover:bg-gray-50"
+                      onClick={() => handleEdit(d)}
+                    >
+                      რედაქტირება
+                    </button>
+                    <button
+                      className="flex-1 text-sm px-3 py-1.5 border rounded text-red-600 hover:bg-red-50"
+                      onClick={() => handleDelete(d.id!)}
+                      disabled={loading}
+                    >
+                      წაშლა
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

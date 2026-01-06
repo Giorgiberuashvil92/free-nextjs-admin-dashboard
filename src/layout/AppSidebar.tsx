@@ -121,6 +121,16 @@ const navItems: NavItem[] = [
     name: "საბსქრიფშენები",
     path: "/subscriptions",
   },
+  {
+    icon: <PieChartIcon />,
+    name: "გადახდები",
+    path: "/payments",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "პოსტები",
+    path: "/posts",
+  },
 ];
 
 const othersItems: NavItem[] = [];

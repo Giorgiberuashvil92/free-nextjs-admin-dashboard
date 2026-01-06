@@ -15,6 +15,8 @@ type Mechanic = {
   isAvailable?: boolean;
   avatar?: string;
   services?: string[];
+  latitude?: number;
+  longitude?: number;
 };
 
 const SPECIALTIES = [
@@ -46,6 +48,8 @@ export default function MechanicsAdminPage() {
     isAvailable: true,
     services: [],
     avatar: "",
+    latitude: undefined,
+    longitude: undefined,
   });
 
   // Debounced filters
@@ -106,6 +110,8 @@ export default function MechanicsAdminPage() {
         isAvailable: form.isAvailable ?? true,
         services: (form.services || []).filter(Boolean),
         avatar: form.avatar?.trim() || undefined,
+        latitude: form.latitude,
+        longitude: form.longitude,
       };
       if (editingId) {
         await apiPatch(`/mechanics/${editingId}`, payload);
@@ -122,6 +128,8 @@ export default function MechanicsAdminPage() {
         isAvailable: true,
         services: [],
         avatar: "",
+        latitude: undefined,
+        longitude: undefined,
       });
       setShowForm(false);
       setEditingId(null);
@@ -147,6 +155,8 @@ export default function MechanicsAdminPage() {
       isAvailable: m.isAvailable,
       services: m.services || [],
       avatar: m.avatar,
+      latitude: m.latitude,
+      longitude: m.longitude,
     });
   };
 
@@ -273,6 +283,30 @@ export default function MechanicsAdminPage() {
                   className="w-full px-3 py-2 border rounded-md"
                   placeholder="ქუჩა, ნომერი"
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={form.latitude || ""}
+                    onChange={(e) => setForm({ ...form, latitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="41.7151"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={form.longitude || ""}
+                    onChange={(e) => setForm({ ...form, longitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 border rounded-md"
+                    placeholder="44.8271"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Avatar URL</label>

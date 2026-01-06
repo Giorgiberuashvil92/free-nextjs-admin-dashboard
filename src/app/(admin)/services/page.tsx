@@ -25,6 +25,8 @@ type Service = {
   workingHours?: string;
   status?: string;
   createdAt?: string;
+  latitude?: number;
+  longitude?: number;
 };
 
 // Fallback კატეგორიები
@@ -73,13 +75,15 @@ export default function ServicesAdminPage() {
     waitTime: "",
     workingHours: "",
     status: "active",
+    latitude: "",
+    longitude: "",
   });
 
   const load = async () => {
     setLoading(true);
     setError("");
     try {
-      const res = await apiGetJson<{ success: boolean; data: Service[] } | Service[]>(`/services/list`);
+      const res = await apiGetJson<{ success: boolean; data: Service[] } | Service[]>(`/services`);
       const data = Array.isArray(res) ? res : (res.success ? res.data : []);
       setServices((data || []).map((s) => ({ ...s, id: s.id || (s as any)._id })));
     } catch (e: unknown) {
@@ -148,6 +152,8 @@ export default function ServicesAdminPage() {
       if (form.features) payload.features = form.features;
       if (form.waitTime) payload.waitTime = form.waitTime;
       if (form.workingHours) payload.workingHours = form.workingHours;
+      if (form.latitude) payload.latitude = parseFloat(form.latitude);
+      if (form.longitude) payload.longitude = parseFloat(form.longitude);
 
       if (editingId) {
         await apiPatch(`/services/${editingId}`, payload);
@@ -175,6 +181,8 @@ export default function ServicesAdminPage() {
         waitTime: "",
         workingHours: "",
         status: "active",
+        latitude: "",
+        longitude: "",
       });
       load();
     } catch (e: unknown) {
@@ -205,6 +213,8 @@ export default function ServicesAdminPage() {
       waitTime: service.waitTime || "",
       workingHours: service.workingHours || "",
       status: service.status || "active",
+      latitude: service.latitude?.toString() || "",
+      longitude: service.longitude?.toString() || "",
     });
     setShowForm(true);
   };
@@ -249,6 +259,8 @@ export default function ServicesAdminPage() {
               waitTime: "",
               workingHours: "",
               status: "active",
+              latitude: "",
+              longitude: "",
             });
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -334,6 +346,35 @@ export default function ServicesAdminPage() {
                   placeholder="სრული მისამართი"
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Latitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full border rounded px-3 py-2"
+                    value={form.latitude}
+                    onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                    placeholder="41.7151"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Longitude
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    className="w-full border rounded px-3 py-2"
+                    value={form.longitude}
+                    onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                    placeholder="44.8271"
+                  />
+                </div>
               </div>
 
               <div>

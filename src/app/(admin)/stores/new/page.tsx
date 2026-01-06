@@ -31,6 +31,8 @@ export default function NewStorePage() {
     workingHours: "",
     ownerId: "",
     images: [] as string[],
+    latitude: "",
+    longitude: "",
   });
 
   const normalizePhone = (phone: string) => {
@@ -59,6 +61,8 @@ export default function NewStorePage() {
         workingHours: form.workingHours.trim() || undefined,
         ownerId: form.ownerId.trim() || "admin",
         images: form.images.filter(Boolean),
+        latitude: form.latitude ? parseFloat(form.latitude) : undefined,
+        longitude: form.longitude ? parseFloat(form.longitude) : undefined,
       };
       await apiPost("/stores", payload);
       router.push("/stores");
@@ -173,6 +177,35 @@ export default function NewStorePage() {
             placeholder="ქუჩა, ნომერი, რაიონი"
             required
           />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Latitude
+            </label>
+            <input
+              type="number"
+              step="any"
+              className="w-full border rounded px-3 py-2"
+              value={form.latitude}
+              onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+              placeholder="41.7151"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Longitude
+            </label>
+            <input
+              type="number"
+              step="any"
+              className="w-full border rounded px-3 py-2"
+              value={form.longitude}
+              onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+              placeholder="44.8271"
+            />
+          </div>
         </div>
 
         <div>

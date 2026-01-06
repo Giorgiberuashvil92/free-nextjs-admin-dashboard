@@ -238,6 +238,28 @@ export default function StoreDetailPage() {
                   onChange={(e) => setData({ ...data, address: e.target.value })}
                 />
               </div>
+              <div>
+                <label className="text-xs text-gray-500">Latitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  className="w-full border rounded px-2 py-1 mt-1"
+                  value={data.latitude || ""}
+                  onChange={(e) => setData({ ...data, latitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  placeholder="41.7151"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500">Longitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  className="w-full border rounded px-2 py-1 mt-1"
+                  value={data.longitude || ""}
+                  onChange={(e) => setData({ ...data, longitude: e.target.value ? parseFloat(e.target.value) : undefined })}
+                  placeholder="44.8271"
+                />
+              </div>
             </>
           ) : (
             <>
@@ -247,6 +269,11 @@ export default function StoreDetailPage() {
               <div>
                 <span className="font-medium">მისამართი:</span> {data.address || "-"}
               </div>
+              {data.latitude && data.longitude && (
+                <div>
+                  <span className="font-medium">კოორდინატები:</span> {data.latitude}, {data.longitude}
+                </div>
+              )}
             </>
           )}
         </div>

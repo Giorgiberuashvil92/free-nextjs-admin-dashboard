@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { apiGet, apiPatch } from "@/lib/api";
 
 type Service = { id: string; name: string; price: number; duration: number; description?: string };
 type WorkingDay = { day: string; startTime: string; endTime: string; isWorking: boolean };
@@ -25,7 +26,6 @@ type CarwashDetail = {
   timeSlotsConfig?: TimeSlotsConfig;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
 const CLOUDINARY_URL = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_URL || "";
 const CLOUDINARY_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "";
 
@@ -41,9 +41,10 @@ export default function CarwashDetailPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/carwash/locations/${id}?t=${Date.now()}`, { cache: "no-store", headers: { 'Cache-Control': 'no-cache' } });
-        const json = await res.json();
-        setData(json?.data || json);
+        const data = await apiGet<CarwashDetail>(`/carwash/locations/${id}?t=${Date.now()}`);
+        setData(data);
+      } catch (error) {
+        console.error('Error loading carwash:', error);
       } finally {
         setLoading(false);
       }

@@ -70,6 +70,8 @@ async function handleRequest(
     const searchParams = url.searchParams.toString();
     const backendUrl = `${getBackendUrl(request)}/${path}${searchParams ? `?${searchParams}` : ''}`;
 
+    console.log(`[PROXY] ${method} ${path} -> ${backendUrl}`);
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
@@ -95,6 +97,8 @@ async function handleRequest(
     const response = await fetch(backendUrl, options);
     const data = await response.text();
     
+    console.log(`[PROXY] Response status: ${response.status}`);
+    
     let jsonData;
     try {
       jsonData = JSON.parse(data);
@@ -111,7 +115,7 @@ async function handleRequest(
       },
     });
   } catch (error) {
-    console.error('Proxy error:', error);
+    console.error('[PROXY] Error:', error);
     return NextResponse.json(
       { error: 'Proxy request failed', message: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

@@ -36,6 +36,8 @@ export default function NewCarRentalPage() {
     minRentalDays: 1,
     maxRentalDays: 30,
     available: true,
+    latitude: "",
+    longitude: "",
   });
 
   const [featureInput, setFeatureInput] = useState("");
@@ -91,6 +93,8 @@ export default function NewCarRentalPage() {
         minRentalDays: form.minRentalDays ? Number(form.minRentalDays) : undefined,
         maxRentalDays: form.maxRentalDays ? Number(form.maxRentalDays) : undefined,
         available: form.available,
+        latitude: form.latitude ? parseFloat(form.latitude) : undefined,
+        longitude: form.longitude ? parseFloat(form.longitude) : undefined,
       };
 
       await apiPost("/car-rental", payload);
@@ -402,6 +406,34 @@ export default function NewCarRentalPage() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="example@gmail.com"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Latitude
+              </label>
+              <input
+                type="number"
+                step="any"
+                className="w-full border rounded px-3 py-2"
+                value={form.latitude}
+                onChange={(e) => setForm({ ...form, latitude: e.target.value })}
+                placeholder="41.7151"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Longitude
+              </label>
+              <input
+                type="number"
+                step="any"
+                className="w-full border rounded px-3 py-2"
+                value={form.longitude}
+                onChange={(e) => setForm({ ...form, longitude: e.target.value })}
+                placeholder="44.8271"
               />
             </div>
           </div>
