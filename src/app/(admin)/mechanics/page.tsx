@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
+import { Modal } from "@/components/ui/modal";
+import { useModal } from "@/hooks/useModal";
 
 type Mechanic = {
   id?: string;
@@ -17,6 +19,23 @@ type Mechanic = {
   services?: string[];
   latitude?: number;
   longitude?: number;
+  likesCount?: number;
+  viewsCount?: number;
+  callsCount?: number;
+};
+
+type EngagementUser = {
+  userId: string;
+  userName?: string;
+  userPhone?: string;
+  userEmail?: string;
+  timestamp?: string;
+};
+
+type MechanicEngagement = {
+  likes?: EngagementUser[];
+  views?: EngagementUser[];
+  calls?: EngagementUser[];
 };
 
 const SPECIALTIES = [
@@ -28,10 +47,19 @@ const SPECIALTIES = [
   "ზოგადი",
 ];
 
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app";
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? '/api/proxy' 
+  : BACKEND_URL;
+
 export default function MechanicsAdminPage() {
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [selectedMechanic, setSelectedMechanic] = useState<Mechanic | null>(null);
+  const [engagement, setEngagement] = useState<MechanicEngagement | null>(null);
+  const [loadingEngagement, setLoadingEngagement] = useState(false);
+  const { isOpen, openModal, closeModal } = useModal();
 
   const [q, setQ] = useState("");
   const [specialty, setSpecialty] = useState<string>("");
@@ -66,7 +94,7 @@ export default function MechanicsAdminPage() {
     return () => clearTimeout(t);
   }, [q, specialty, location]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -75,13 +103,136 @@ export default function MechanicsAdminPage() {
       if (dspecialty) params.append("specialty", dspecialty);
       if (dlocation) params.append("location", dlocation);
       const data = await apiGet<Mechanic[]>(`/mechanics${params.toString() ? `?${params.toString()}` : ""}`);
-      setMechanics(data || []);
+      const mechanicsList = data || [];
+      
+      // ჩატვირთე სტატისტიკა თითოეული მექანიკოსისთვის
+      const mechanicsWithStats = await Promise.all(
+        mechanicsList.map(async (mechanic) => {
+          if (!mechanic.id) return mechanic;
+          try {
+            const endpoints = [
+              `/mechanics/${mechanic.id}/stats`,
+              `/mechanics/${mechanic.id}/engagement`,
+              `/analytics/mechanic/${mechanic.id}`,
+            ];
+            
+            let stats: any = {};
+            for (const endpoint of endpoints) {
+              try {
+                const statsRes = await fetch(`${API_BASE}${endpoint}`, {
+                  headers: { "Content-Type": "application/json" },
+                  cache: "no-store",
+                });
+                if (statsRes.ok) {
+                  const statsData = await statsRes.json();
+                  stats = statsData.data || statsData || {};
+                  if (stats.likesCount !== undefined || stats.viewsCount !== undefined) break;
+                }
+              } catch (e) {
+                // გავაგრძელოთ
+              }
+            }
+            
+            return {
+              ...mechanic,
+              likesCount: stats.likesCount || stats.likes || 0,
+              viewsCount: stats.viewsCount || stats.views || 0,
+              callsCount: stats.callsCount || stats.calls || 0,
+            };
+          } catch (e) {
+            return mechanic;
+          }
+        })
+      );
+      
+      setMechanics(mechanicsWithStats);
     } catch (e: unknown) {
       const msg = e && typeof e === "object" && "message" in e ? String((e as { message?: string }).message) : "შეცდომა მექანიკოსების ჩატვირთვისას";
       setError(msg);
       console.error(e);
     } finally {
       setLoading(false);
+    }
+  }, [dq, dspecialty, dlocation]);
+
+  const loadEngagement = useCallback(async (mechanicId: string) => {
+    if (!mechanicId) return;
+    setLoadingEngagement(true);
+    try {
+      const endpoints = [
+        `/mechanics/${mechanicId}/engagement`,
+        `/mechanics/${mechanicId}/likes`,
+        `/mechanics/${mechanicId}/views`,
+        `/mechanics/${mechanicId}/calls`,
+        `/analytics/mechanic/${mechanicId}/engagement`,
+      ];
+      
+      let engagementData: MechanicEngagement = {};
+      
+      for (const endpoint of endpoints) {
+        try {
+          const res = await fetch(`${API_BASE}${endpoint}`, {
+            headers: { "Content-Type": "application/json" },
+            cache: "no-store",
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const result = data.data || data;
+            if (result.likes || result.views || result.calls) {
+              engagementData = result;
+              break;
+            }
+          }
+        } catch (e) {
+          // გავაგრძელოთ
+        }
+      }
+      
+      if (!engagementData.likes) {
+        try {
+          const likesRes = await fetch(`${API_BASE}/mechanics/${mechanicId}/likes`, { cache: "no-store" });
+          if (likesRes.ok) {
+            const likesData = await likesRes.json();
+            engagementData.likes = Array.isArray(likesData) ? likesData : (likesData.data || likesData.likes || []);
+          }
+        } catch (e) {}
+      }
+      
+      if (!engagementData.views) {
+        try {
+          const viewsRes = await fetch(`${API_BASE}/mechanics/${mechanicId}/views`, { cache: "no-store" });
+          if (viewsRes.ok) {
+            const viewsData = await viewsRes.json();
+            engagementData.views = Array.isArray(viewsData) ? viewsData : (viewsData.data || viewsData.views || []);
+          }
+        } catch (e) {}
+      }
+      
+      if (!engagementData.calls) {
+        try {
+          const callsRes = await fetch(`${API_BASE}/mechanics/${mechanicId}/calls`, { cache: "no-store" });
+          if (callsRes.ok) {
+            const callsData = await callsRes.json();
+            engagementData.calls = Array.isArray(callsData) ? callsData : (callsData.data || callsData.calls || []);
+          }
+        } catch (e) {}
+      }
+      
+      setEngagement(engagementData);
+    } catch (e) {
+      console.error("Error loading engagement:", e);
+      setEngagement({});
+    } finally {
+      setLoadingEngagement(false);
+    }
+  }, []);
+
+  const handleViewStats = (mechanic: Mechanic) => {
+    setSelectedMechanic(mechanic);
+    setEngagement(null);
+    openModal();
+    if (mechanic.id) {
+      loadEngagement(mechanic.id);
     }
   };
 
@@ -381,8 +532,9 @@ export default function MechanicsAdminPage() {
                 <th className="px-4 py-2 text-left">ლოკაცია</th>
                 <th className="px-4 py-2 text-left">ტელეფონი</th>
                 <th className="px-4 py-2 text-left">სტატუსი</th>
+                <th className="px-4 py-2 text-left">სტატისტიკა</th>
+                <th className="px-4 py-2 text-left">მოქმედებები</th>
               </tr>
-              <th className="px-4 py-2 text-left">მოქმედებები</th>
             </thead>
             <tbody>
               {mechanics.map((m) => (
@@ -411,6 +563,28 @@ export default function MechanicsAdminPage() {
                     </span>
                   </td>
                   <td className="px-4 py-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <div className="flex items-center gap-1 text-red-500">
+                        <span>❤️</span>
+                        <span>{m.likesCount || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-blue-500">
+                        <span>👁️</span>
+                        <span>{m.viewsCount || 0}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-green-500">
+                        <span>📞</span>
+                        <span>{m.callsCount || 0}</span>
+                      </div>
+                      <button
+                        onClick={() => handleViewStats(m)}
+                        className="ml-2 text-brand-500 hover:text-brand-600 text-xs font-medium"
+                      >
+                        დეტალები
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
                     <div className="flex gap-3">
                       <button onClick={() => onEdit(m)} className="text-blue-600 hover:text-blue-800">რედაქტირება</button>
                       <button onClick={() => onDelete(m.id)} className="text-red-600 hover:text-red-800">წაშლა</button>
@@ -422,6 +596,182 @@ export default function MechanicsAdminPage() {
           </table>
         )}
       </div>
+
+      {/* სტატისტიკის მოდალი */}
+      <Modal
+        isOpen={isOpen}
+        onClose={closeModal}
+        className="max-w-4xl p-6 lg:p-8 max-h-[90vh] overflow-y-auto"
+      >
+        <div className="space-y-6">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              {selectedMechanic?.name || "მექანიკოსის"} სტატისტიკა
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              ლაიქები, ნახვები და დარეკვის ღილაკის დაჭერები
+            </p>
+          </div>
+
+          {selectedMechanic && (
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                <div className="text-sm text-red-600 dark:text-red-400 mb-1">ლაიქები</div>
+                <div className="text-2xl font-bold text-red-700 dark:text-red-300">
+                  {selectedMechanic.likesCount || 0}
+                </div>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">ნახვები</div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                  {selectedMechanic.viewsCount || 0}
+                </div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                <div className="text-sm text-green-600 dark:text-green-400 mb-1">დარეკვები</div>
+                <div className="text-2xl font-bold text-green-700 dark:text-green-300">
+                  {selectedMechanic.callsCount || 0}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loadingEngagement ? (
+            <div className="text-center py-8 text-gray-500">იტვირთება...</div>
+          ) : engagement ? (
+            <div className="space-y-6">
+              {/* ლაიქები */}
+              {engagement.likes && engagement.likes.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    ვინ დაალაიქა ({engagement.likes.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {engagement.likes.map((like, idx) => (
+                      <div
+                        key={`${like.userId}-${idx}`}
+                        className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                      >
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {like.userName || like.userId?.slice(0, 8) || "უცნობი"}
+                        </div>
+                        {like.userPhone && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {like.userPhone}
+                          </div>
+                        )}
+                        {like.userEmail && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {like.userEmail}
+                          </div>
+                        )}
+                        {like.timestamp && (
+                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(like.timestamp).toLocaleString("ka-GE")}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ნახვები */}
+              {engagement.views && engagement.views.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    ვინ ნახა ({engagement.views.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {engagement.views.map((view, idx) => (
+                      <div
+                        key={`${view.userId}-${idx}`}
+                        className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                      >
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {view.userName || view.userId?.slice(0, 8) || "უცნობი"}
+                        </div>
+                        {view.userPhone && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {view.userPhone}
+                          </div>
+                        )}
+                        {view.userEmail && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {view.userEmail}
+                          </div>
+                        )}
+                        {view.timestamp && (
+                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(view.timestamp).toLocaleString("ka-GE")}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* დარეკვები */}
+              {engagement.calls && engagement.calls.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    ვინ დააჭირა დარეკვის ღილაკს ({engagement.calls.length})
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {engagement.calls.map((call, idx) => (
+                      <div
+                        key={`${call.userId}-${idx}`}
+                        className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"
+                      >
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {call.userName || call.userId?.slice(0, 8) || "უცნობი"}
+                        </div>
+                        {call.userPhone && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {call.userPhone}
+                          </div>
+                        )}
+                        {call.userEmail && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                            {call.userEmail}
+                          </div>
+                        )}
+                        {call.timestamp && (
+                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                            {new Date(call.timestamp).toLocaleString("ka-GE")}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(!engagement.likes || engagement.likes.length === 0) &&
+                (!engagement.views || engagement.views.length === 0) &&
+                (!engagement.calls || engagement.calls.length === 0) && (
+                  <div className="text-center py-8 text-gray-500">
+                    სტატისტიკა არ მოიძებნა
+                  </div>
+                )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              სტატისტიკა არ მოიძებნა
+            </div>
+          )}
+
+          <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={closeModal}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+            >
+              დახურვა
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

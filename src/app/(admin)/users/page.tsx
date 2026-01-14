@@ -20,6 +20,7 @@ type UserRow = {
   email?: string;
   firstName?: string;
   lastName?: string;
+  personalId?: string; // idNumber from API
   role: string;
   isActive: boolean;
   createdAt?: number | string;
@@ -57,7 +58,7 @@ export default function UsersPage() {
   const [userLoginHistory, setUserLoginHistory] = useState<Record<string, any[]>>({});
   const [loadingUserData, setLoadingUserData] = useState<Record<string, boolean>>({});
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
-  const [editForm, setEditForm] = useState({ role: '', isActive: true });
+  const [editForm, setEditForm] = useState({ role: '', isActive: true, personalId: '' });
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");
@@ -136,6 +137,34 @@ export default function UsersPage() {
       });
       
       await Promise.all(subscriptionPromises);
+
+      // Load personalId for users that don't have it (if API doesn't return it in list)
+      // Check if any users are missing personalId and load from detail endpoint
+      const usersNeedingPersonalId = (res.data ?? []).filter((u: UserRow) => !u.personalId);
+      if (usersNeedingPersonalId.length > 0) {
+        const personalIdPromises = usersNeedingPersonalId.map(async (user: UserRow) => {
+          try {
+            const userDetailRes = await fetch(`${API_BASE}/users/${user.id}?t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { 'Cache-Control': 'no-cache' }
+            });
+            if (userDetailRes.ok) {
+              const userDetailData = await userDetailRes.json();
+              const userDetail = userDetailData?.data || userDetailData;
+              if (userDetail.personalId) {
+                // Update the user in rows with personalId
+                setRows(prev => prev.map(u => 
+                  u.id === user.id ? { ...u, personalId: userDetail.personalId } : u
+                ));
+              }
+            }
+          } catch (e) {
+            // Ignore errors for individual user details
+          }
+        });
+        // Run in background, don't wait for it
+        Promise.all(personalIdPromises).catch(() => {});
+      }
     } catch (e: unknown) {
       const message = e && typeof e === "object" && "message" in e ? String((e as { message?: unknown }).message) : "Request failed";
       setErr(message || "Failed to load");
@@ -174,7 +203,7 @@ export default function UsersPage() {
 
   const handleEdit = (user: UserRow) => {
     setEditingUser(user);
-    setEditForm({ role: user.role, isActive: user.isActive });
+    setEditForm({ role: user.role, isActive: user.isActive, personalId: user.personalId || '' });
   };
 
   const handleSaveEdit = async () => {
@@ -186,6 +215,7 @@ export default function UsersPage() {
       await apiPatch(`/users/${editingUser.id}`, {
         role: editForm.role,
         isActive: editForm.isActive,
+        personalId: editForm.personalId?.trim() || undefined,
       });
       alert('✅ მომხმარებელი წარმატებით განახლდა!');
       setEditingUser(null);
@@ -421,7 +451,7 @@ export default function UsersPage() {
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">Send Welcome Notification</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                Send &quot;მადლობა რომ შემოვიდით&quot; push notification to all users
+                Send &quot;აპლიკაცია განახლდა&quot; push notification to all users
               </p>
             </div>
             <button
@@ -439,8 +469,8 @@ export default function UsersPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      title: 'გილოცავთ ! ',
-                      body: 'გილოცავთ ახალ წელს! 🎉',
+                      title: 'MARTE ! ',
+                      body: 'აპლიკაცია განახლდა გაიარე ავტორიზაცია და მიიღე შეთავაზებები ..! 🎉',
                       data: {
                         type: 'welcome',
                         timestamp: new Date().toISOString(),
@@ -537,6 +567,18 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Personal ID (ID Number)
+                </label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white"
+                  value={editForm.personalId}
+                  onChange={(e) => setEditForm({ ...editForm, personalId: e.target.value })}
+                  placeholder="მაგ: 01001012345"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Role
                 </label>
                 <select
@@ -549,6 +591,7 @@ export default function UsersPage() {
                   <option value="manager">manager</option>
                   <option value="employee">employee</option>
                   <option value="user">user</option>
+                  <option value="partner">პარტნიორი</option>
                 </select>
               </div>
               <div>
@@ -596,6 +639,7 @@ export default function UsersPage() {
             <option value="manager">manager</option>
             <option value="employee">employee</option>
             <option value="user">user</option>
+            <option value="partner">პარტნიორი</option>
           </select>
         </div>
         <div>
@@ -626,6 +670,7 @@ export default function UsersPage() {
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">User ID</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">საბსქრიფშენი</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Personal ID</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Phone</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Email</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Role</th>
@@ -691,6 +736,7 @@ export default function UsersPage() {
                       <span className="font-medium">{[u.firstName, u.lastName].filter(Boolean).join(' ') || '-'}</span>
                     </div>
                   </td>
+                  <td className="px-3 py-2 font-mono text-xs">{u.personalId || '-'}</td>
                   <td className="px-3 py-2 font-mono text-xs">{u.phone}</td>
                   <td className="px-3 py-2 text-xs">{u.email || '-'}</td>
                   <td className="px-3 py-2">

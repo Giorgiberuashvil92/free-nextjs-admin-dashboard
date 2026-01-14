@@ -18,6 +18,11 @@ type Part = {
   phone?: string;
   seller?: string;
   createdAt?: string;
+  images?: string[];
+  description?: string;
+  partNumber?: string;
+  warranty?: string;
+  isNegotiable?: boolean;
 };
 
 // Fallback კატეგორიები
@@ -68,7 +73,6 @@ export default function PartsAdminPage() {
   useEffect(() => {
     loadCategories();
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadCategories = async () => {
@@ -409,56 +413,150 @@ export default function PartsAdminPage() {
         </div>
       )}
 
-      <div className="overflow-x-auto border rounded-md">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-3 py-2 text-left">ID</th>
-              <th className="px-3 py-2 text-left">დასახელება</th>
-              <th className="px-3 py-2 text-left">კატეგორია</th>
-              <th className="px-3 py-2 text-left">მდგომარეობა</th>
-              <th className="px-3 py-2 text-left">ფასი</th>
-              <th className="px-3 py-2 text-left">ბრენდი/მოდელი</th>
-              <th className="px-3 py-2 text-left">ქალაქი</th>
-              <th className="px-3 py-2 text-left">ტელეფონი</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td className="px-3 py-8 text-center text-gray-500" colSpan={8}>
-                  Loading...
-                </td>
-              </tr>
+      {loading ? (
+        <div className="text-center text-gray-500 py-10">იტვირთება...</div>
+      ) : parts.length === 0 ? (
+        <div className="text-center text-gray-500 py-10">ნაწილები არ არის</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {parts.map((p) => {
+            const partImage = p.images?.[0];
+            const partId = p.id || p._id;
+            
+            return (
+              <div key={partId} className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+                {/* Image Section */}
+                <div className="relative h-48 bg-gray-100">
+                  {partImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img 
+                      src={partImage} 
+                      alt={p.title || "ნაწილი"} 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                  )}
+                  {p.isNegotiable && (
+                    <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded font-semibold">
+                      შეთანხმებით
+                    </div>
+                  )}
+                </div>
+
+                {/* Content Section */}
+                <div className="p-4 space-y-3">
+                  <div>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-lg font-semibold truncate flex-1">{p.title || 'უსახელო ნაწილი'}</h3>
+                      {p.category && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 ml-2">
+                          {p.category}
+                        </span>
             )}
-            {!loading && parts.length === 0 && (
-              <tr>
-                <td className="px-3 py-8 text-center text-gray-500" colSpan={8}>
-                  No parts
-                </td>
-              </tr>
+                    </div>
+                    {(p.brand || p.model) && (
+                      <div className="text-sm text-gray-600">
+                        {p.brand || ''} {p.model ? `/ ${p.model}` : ''}
+                      </div>
             )}
-            {parts.map((p) => (
-              <tr key={p.id} className="border-t">
-                <td className="px-3 py-2">
-                  <a className="text-blue-600 underline" href={`/parts/${p.id}`}>
-                    {p.id?.substring(0, 8)}...
-                  </a>
-                </td>
-                <td className="px-3 py-2">{p.title || "-"}</td>
-                <td className="px-3 py-2">{p.category || "-"}</td>
-                <td className="px-3 py-2">{p.condition || "-"}</td>
-                <td className="px-3 py-2">{p.price || "-"}</td>
-                <td className="px-3 py-2">
-                  {p.brand || "-"} {p.model ? `/ ${p.model}` : ""}
-                </td>
-                <td className="px-3 py-2">{p.location || "-"}</td>
-                <td className="px-3 py-2">{p.phone || "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    {partId && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        ID: <a className="text-blue-600 underline" href={`/parts/${partId}`} target="_blank" rel="noopener noreferrer">{partId.substring(0, 8)}...</a>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-600">ფასი:</span>
+                      <span className="font-semibold text-lg text-green-600">{p.price ? `₾${p.price}` : '—'}</span>
+                    </div>
+                    {p.condition && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                        {p.condition}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {p.location && (
+                      <span className="px-2 py-0.5 rounded bg-gray-100 border">
+                        📍 {p.location}
+                      </span>
+                    )}
+                    {p.phone && (
+                      <span className="px-2 py-0.5 rounded bg-gray-100 border">
+                        📞 {p.phone}
+                      </span>
+                    )}
+                    {p.seller && (
+                      <span className="px-2 py-0.5 rounded bg-gray-100 border">
+                        👤 {p.seller}
+                      </span>
+                    )}
+                  </div>
+
+                  {p.partNumber && (
+                    <div className="text-xs text-gray-600">
+                      <span className="font-medium">ნაწილის ნომერი:</span> {p.partNumber}
+                    </div>
+                  )}
+
+                  {p.warranty && (
+                    <div className="text-xs text-gray-600">
+                      <span className="font-medium">გარანტია:</span> {p.warranty}
+                    </div>
+                  )}
+
+                  {p.description && (
+                    <div className="text-xs text-gray-600 line-clamp-2">
+                      {p.description}
+                    </div>
+                  )}
+
+                  {p.createdAt && (
+                    <div className="text-xs text-gray-500 border-t pt-2">
+                      დამატებული: {new Date(p.createdAt).toLocaleDateString('ka-GE')}
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <a 
+                      className="text-sm px-3 py-1.5 border rounded hover:bg-gray-50" 
+                      href={`/parts/${partId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      გახსნა
+                    </a>
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`დარწმუნებული ხართ რომ გსურთ ამ ნაწილის წაშლა? (ID: ${partId})`)) return;
+                        try {
+                          await apiDelete(`/parts/${partId}`);
+                          await load();
+                        } catch (e: unknown) {
+                          const message = e && typeof e === 'object' && 'message' in e ? String((e as { message?: unknown }).message) : 'წაშლა ვერ მოხერხდა';
+                          alert(`წაშლა ვერ მოხერხდა: ${message}`);
+                        }
+                      }}
+                      className="text-sm px-3 py-1.5 border rounded text-red-600 hover:bg-red-50"
+                    >
+                      წაშლა
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
       </div>
+      )}
     </div>
   );
 }

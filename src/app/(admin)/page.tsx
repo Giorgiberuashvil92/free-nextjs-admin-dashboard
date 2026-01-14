@@ -21,6 +21,10 @@ interface DashboardStats {
     loginsToday: number;
     stories: number;
   };
+  smsBalance?: {
+    balance: number;
+    overdraft: number;
+  };
 }
 
 export default function Dashboard() {
@@ -36,7 +40,7 @@ export default function Dashboard() {
       setLoading(true);
 
       // Fetch all data with error handling for each
-      const [usersRes, loginStatsRes, mechanicsRes, carwashesRes, carRentalsRes, storesRes, storiesRes] = await Promise.allSettled([
+      const [usersRes, loginStatsRes, mechanicsRes, carwashesRes, carRentalsRes, storesRes, storiesRes, smsBalanceRes] = await Promise.allSettled([
         apiGetJson<{ success: boolean; total: number }>('/users?limit=1'),
         apiGetJson<{ success: boolean; data: { totalLogins: number; loginsToday: number; uniqueUsers: number; uniqueUsersToday: number } }>('/login-history/stats'),
         apiGetJson<{ success: boolean; total: number }>('/mechanics?limit=1'),
@@ -44,6 +48,7 @@ export default function Dashboard() {
         apiGetJson<{ success: boolean; data: any[] }>('/car-rental'),
         apiGetJson<{ success: boolean; total: number }>('/stores?limit=1'),
         apiGetJson<{ success: boolean; data: any[] }>('/stories'),
+        fetch('/api/sms-balance').then(res => res.json()).catch(() => null),
       ]);
 
       const dashboardStats: DashboardStats = {
@@ -68,6 +73,12 @@ export default function Dashboard() {
           loginsToday: loginStatsRes.status === 'fulfilled' ? (loginStatsRes.value.data?.loginsToday || 0) : 0,
           stories: storiesRes.status === 'fulfilled' ? (storiesRes.value.data?.length || 0) : 0,
         },
+        smsBalance: smsBalanceRes.status === 'fulfilled' && smsBalanceRes.value?.success
+          ? {
+              balance: smsBalanceRes.value.balance || 0,
+              overdraft: smsBalanceRes.value.overdraft || 0,
+            }
+          : undefined,
       };
 
       setStats(dashboardStats);
@@ -115,7 +126,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         {/* Users Card */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
           <div className="flex items-center justify-between mb-4">
@@ -186,6 +197,32 @@ export default function Dashboard() {
             <span className="bg-white/20 px-2 py-1 rounded">
               აქტიური სტორიები
             </span>
+          </div>
+        </div>
+
+        {/* SMS Balance Card */}
+        <div className="bg-gradient-to-br from-teal-500 to-teal-600 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">💬</span>
+            </div>
+            <div className="text-right">
+              <div className="text-xs opacity-80 mb-1">SMS ბალანსი</div>
+              <div className="text-3xl font-bold">
+                {stats.smsBalance ? `${stats.smsBalance.balance.toFixed(2)} ₾` : '—'}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            {stats.smsBalance ? (
+              <span className="bg-white/20 px-2 py-1 rounded">
+                {stats.smsBalance.balance < 10 ? '⚠️ დაბალი ბალანსი' : '✅ აქტიური'}
+              </span>
+            ) : (
+              <span className="bg-white/20 px-2 py-1 rounded text-xs opacity-70">
+                ვერ ჩაიტვირთა
+              </span>
+            )}
           </div>
         </div>
       </div>

@@ -63,6 +63,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "ევაკუატორები",
+    path: "/evacuators",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "ავტოსამრეცხაოები",
     path: "/carwashes",
   },
@@ -85,6 +90,16 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "დაშლილები",
     path: "/dismantlers",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "დითეილინგი",
+    path: "/detailing",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ავტომობილის ინტერიერი",
+    path: "/interior",
   },
   {
     icon: <PieChartIcon />,
@@ -130,6 +145,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "პოსტები",
     path: "/posts",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ფიდბექები",
+    path: "/feedback",
   },
 ];
 

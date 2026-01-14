@@ -6,14 +6,8 @@ import ImageUpload from "@/components/ImageUpload";
 import { AssignStoreOwnerModal } from "@/components/AssignStoreOwnerModal";
 import { useModal } from "@/hooks/useModal";
 
-const STORE_TYPES = [
-  "მაღაზია",
-  "ნაწილები",
-  "დაშლილები",
-  "ზეთები",
-  "ხელოსნები",
-  "ავტოსერვისები",
-  "ევაკუატორი"
+const INTERIOR_TYPES = [
+  "ავტომობილის ინტერიერი"
 ];
 
 type StoreDetail = {
@@ -60,7 +54,7 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
   ? '/api/proxy' 
   : BACKEND_URL;
 
-export default function StoreDetailPage() {
+export default function InteriorDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [data, setData] = useState<StoreDetail | null>(null);
@@ -73,7 +67,7 @@ export default function StoreDetailPage() {
     if (!id) return;
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/stores/${id}?t=${Date.now()}`, { 
+      const res = await fetch(`${API_BASE}/interior/${id}?t=${Date.now()}`, { 
         cache: "no-store", 
         headers: { 'Cache-Control': 'no-cache' } 
       });
@@ -106,7 +100,7 @@ export default function StoreDetailPage() {
     if (!data) return;
     setSaving(true);
     try {
-      const res = await fetch(`${API_BASE}/stores/${id}`, {
+      const res = await fetch(`${API_BASE}/interior/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -136,7 +130,7 @@ export default function StoreDetailPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="px-2 py-1 border rounded">
+          <button onClick={() => router.push('/interior')} className="px-2 py-1 border rounded">
             Back
           </button>
           <h1 className="text-2xl font-semibold">{storeName}</h1>
@@ -326,8 +320,7 @@ export default function StoreDetailPage() {
                   value={data.type || ""}
                   onChange={(e) => setData({ ...data, type: e.target.value })}
                 >
-                  <option value="">აირჩიეთ</option>
-                  {STORE_TYPES.map((type) => (
+                  {INTERIOR_TYPES.map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>

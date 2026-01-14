@@ -43,6 +43,7 @@ type UserDetail = {
   email?: string;
   firstName?: string;
   lastName?: string;
+  personalId?: string; // idNumber from API
   role: string;
   isActive: boolean;
   avatar?: string;
@@ -90,6 +91,7 @@ export default function UserDetailPage() {
           lastName: userData.lastName || '',
           email: userData.email || '',
           phone: userData.phone || '',
+          personalId: userData.personalId || '',
           role: userData.role || 'customer',
           isActive: userData.isActive !== undefined ? userData.isActive : true,
           address: userData.address || '',
@@ -292,6 +294,7 @@ export default function UserDetailPage() {
                       lastName: user.lastName || '',
                       email: user.email || '',
                       phone: user.phone || '',
+                      personalId: user.personalId || '',
                       role: user.role || 'customer',
                       isActive: user.isActive !== undefined ? user.isActive : true,
                       address: user.address || '',
@@ -345,6 +348,16 @@ export default function UserDetailPage() {
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Personal ID (ID Number)</label>
+                  <input
+                    type="text"
+                    value={editForm.personalId || ''}
+                    onChange={(e) => setEditForm({ ...editForm, personalId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                    placeholder="მაგ: 01001012345"
+                  />
+                </div>
               </>
             ) : (
               <>
@@ -366,6 +379,15 @@ export default function UserDetailPage() {
                       >
                         {user.email}
                       </a>
+                    </div>
+                  </div>
+                )}
+                {user.personalId && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400">🆔</span>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Personal ID</div>
+                      <div className="font-medium text-gray-900 dark:text-white font-mono">{user.personalId}</div>
                     </div>
                   </div>
                 )}
@@ -392,6 +414,7 @@ export default function UserDetailPage() {
                     <option value="manager">manager</option>
                     <option value="employee">employee</option>
                     <option value="user">user</option>
+                    <option value="partner">პარტნიორი</option>
                   </select>
                 </div>
                 <div>
@@ -672,7 +695,7 @@ export default function UserDetailPage() {
             <div className="text-gray-400 text-4xl mb-4">📱</div>
             <div className="text-gray-500 dark:text-gray-400 font-medium mb-2">No device tokens found</div>
             <div className="text-sm text-gray-400 dark:text-gray-500">
-              This user hasn't registered any devices yet.
+              This user hasn&apos;t registered any devices yet.
             </div>
           </div>
         ) : (
