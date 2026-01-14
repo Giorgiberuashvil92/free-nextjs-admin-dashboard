@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { apiGet, apiPatch } from "@/lib/api";
+import { apiGet, apiPatch, API_BASE } from "@/lib/api";
 
 type Service = { id: string; name: string; price: number; duration: number; description?: string };
 type WorkingDay = { day: string; startTime: string; endTime: string; isWorking: boolean };
