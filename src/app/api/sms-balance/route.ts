@@ -4,8 +4,8 @@ import querystring from 'querystring';
 
 const SMS_API_KEY = '65fa7f724d09ed5357688a00a643f657';
 
-export async function GET() {
-  return new Promise((resolve) => {
+export async function GET(): Promise<NextResponse> {
+  return new Promise<NextResponse>((resolve) => {
     const data = querystring.stringify({ apikey: SMS_API_KEY });
 
     const options = {
