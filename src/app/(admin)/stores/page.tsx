@@ -570,7 +570,7 @@ export default function StoresListPage() {
                       )}
                     </div>
                   </div>
-
+                  
                   {/* Owner Info & Assign Button */}
                   <div className="mt-3 pt-3 border-t">
                     {s.ownerId ? (

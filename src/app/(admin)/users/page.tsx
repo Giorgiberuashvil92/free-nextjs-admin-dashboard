@@ -26,6 +26,7 @@ type UserRow = {
   createdAt?: number | string;
   updatedAt?: number | string;
   avatar?: string;
+  profileImage?: string; // API-დან მოდის profileImage (Cloudinary URL, მაგ: https://res.cloudinary.com/...)
   address?: string;
   city?: string;
   country?: string;
@@ -70,7 +71,20 @@ export default function UsersPage() {
       params.set("limit", String(limit));
       params.set("offset", String(offset));
       const res = await apiGetJson<{ success: boolean; data: UserRow[]; total: number; limit: number; offset: number }>(`/users?${params.toString()}`);
-      setRows(res.data ?? []);
+      // Map profileImage to avatar if avatar doesn't exist
+      const mappedData = (res.data ?? []).map(user => {
+        // Get the image URL - prefer profileImage over avatar
+        const imageUrl = user.profileImage || user.avatar;
+        // Only set avatar if we have a valid URL (starts with http)
+        const validImageUrl = imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : undefined;
+        return {
+          ...user,
+          avatar: validImageUrl,
+          // Keep profileImage as well for direct access
+          profileImage: user.profileImage && typeof user.profileImage === 'string' && user.profileImage.startsWith('http') ? user.profileImage : undefined
+        };
+      });
+      setRows(mappedData);
       setTotal(res.total ?? 0);
       
       // Load subscriptions for all users
@@ -469,8 +483,8 @@ export default function UsersPage() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      title: 'MARTE ! ',
-                      body: 'აპლიკაცია განახლდა გაიარე ავტორიზაცია და მიიღე შეთავაზებები ..! 🎉',
+                      title: 'MARTE 🎉 ! ',
+                      body: '⛽ 200 ლიტრი ბენზინის გათამაშება დაიწყო! გათამაშებაში მონაწილეობა შესაძლებელია მხოლოდ განახლებული აპიდან. გაანახლე აპლიკაცია და ჩაერთე გათამაშებაში! 🎉',
                       data: {
                         type: 'welcome',
                         timestamp: new Date().toISOString(),
@@ -724,13 +738,51 @@ export default function UsersPage() {
                     })()}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      {u.avatar ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={u.avatar} alt="avatar" className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-700" />
+                    <div className="flex items-center gap-3">
+                      {((u.profileImage || u.avatar) && (u.profileImage || u.avatar) !== 'avatar' && (u.profileImage || u.avatar)?.startsWith('http')) ? (
+                        <div className="relative group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={u.profileImage || u.avatar} 
+                            alt="avatar" 
+                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all shadow-sm hover:shadow-md" 
+                            onError={(e) => {
+                              // If image fails to load, replace with placeholder
+                              const target = e.target as HTMLImageElement;
+                              target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent([u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}&background=6366f1&color=fff&size=128&bold=true`;
+                            }}
+                          />
+                          {/* Hover tooltip with larger image */}
+                          <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img 
+                              src={u.profileImage || u.avatar} 
+                              alt="avatar preview" 
+                              className="w-48 h-48 rounded-lg object-cover"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent([u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}&background=6366f1&color=fff&size=256&bold=true`;
+                              }}
+                            />
+                          </div>
+                        </div>
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-semibold">
-                          {[u.firstName, u.lastName].filter(Boolean).join(' ').charAt(0).toUpperCase() || u.phone.charAt(0)}
+                        <div className="relative group">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img 
+                            src={`https://ui-avatars.com/api/?name=${encodeURIComponent([u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}&background=6366f1&color=fff&size=128&bold=true`}
+                            alt="avatar" 
+                            className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-all shadow-sm hover:shadow-md" 
+                          />
+                          {/* Hover tooltip with larger image */}
+                          <div className="absolute left-0 top-full mt-2 hidden group-hover:block z-50 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img 
+                              src={`https://ui-avatars.com/api/?name=${encodeURIComponent([u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}&background=6366f1&color=fff&size=256&bold=true`}
+                              alt="avatar preview" 
+                              className="w-48 h-48 rounded-lg object-cover"
+                            />
+                          </div>
                         </div>
                       )}
                       <span className="font-medium">{[u.firstName, u.lastName].filter(Boolean).join(' ') || '-'}</span>
@@ -823,6 +875,54 @@ export default function UsersPage() {
                         </div>
                       ) : (
                         <div className="space-y-6">
+                          {/* User Profile Photo Section */}
+                          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                            <div className="flex items-center gap-6">
+                              {(u.profileImage || u.avatar) ? (
+                                <div className="relative">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img 
+                                    src={u.profileImage || u.avatar} 
+                                    alt="user avatar" 
+                                    className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700 shadow-lg"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).style.display = 'none';
+                                      const fallback = (e.target as HTMLImageElement).nextElementSibling as HTMLElement;
+                                      if (fallback) fallback.style.display = 'flex';
+                                    }}
+                                  />
+                                  <div className="w-32 h-32 rounded-full bg-gray-200 dark:bg-gray-700 items-center justify-center shadow-lg border-4 border-gray-200 dark:border-gray-700 hidden">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img 
+                                      src={`https://ui-avatars.com/api/?name=${encodeURIComponent([u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}&background=6366f1&color=fff&size=256&bold=true`} 
+                                      alt="fallback avatar" 
+                                      className="w-full h-full rounded-full object-cover"
+                                    />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="relative">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img 
+                                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent([u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}&background=6366f1&color=fff&size=256&bold=true`} 
+                                    alt="user avatar" 
+                                    className="w-32 h-32 rounded-full object-cover border-4 border-gray-200 dark:border-gray-700 shadow-lg"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex-1">
+                                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                  {[u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone}
+                                </h3>
+                                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                                  {u.email && <div>📧 {u.email}</div>}
+                                  <div>📱 {u.phone}</div>
+                                  {u.personalId && <div>🆔 {u.personalId}</div>}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
                           {/* User Summary Cards */}
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             {/* Subscription Card */}

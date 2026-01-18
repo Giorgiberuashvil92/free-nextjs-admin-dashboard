@@ -47,6 +47,7 @@ type UserDetail = {
   role: string;
   isActive: boolean;
   avatar?: string;
+  profileImage?: string; // API-დან მოდის profileImage (Cloudinary URL)
   address?: string;
   city?: string;
   country?: string;
@@ -215,17 +216,20 @@ export default function UserDetailPage() {
             ← Back
           </button>
           <div className="flex items-center gap-4">
-            {user.avatar ? (
+            {(user.profileImage || user.avatar) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img 
-                src={user.avatar} 
+                src={user.profileImage || user.avatar} 
                 alt={userName} 
                 className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700" 
               />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-semibold">
-                {userName.charAt(0).toUpperCase()}
-              </div>
+              // eslint-disable-next-line @next/next/no-img-element
+              <img 
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=6366f1&color=fff&size=128&bold=true`}
+                alt={userName} 
+                className="w-16 h-16 rounded-full object-cover border-2 border-gray-200 dark:border-gray-700" 
+              />
             )}
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{userName}</h1>
