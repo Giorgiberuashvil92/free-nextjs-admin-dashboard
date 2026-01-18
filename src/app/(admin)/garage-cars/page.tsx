@@ -304,8 +304,8 @@ export default function GarageCarsPage() {
                     მომლოდინი)
                   </div>
                   {(car.reminders?.stats.urgent || 0) > 0 && (
-                    <div className="text-xs text-red-600 mt-1">
-                      ⚠️ {car.reminders.stats.urgent} გადაუდებელი
+                  <div className="text-xs text-red-600 mt-1">
+                      ⚠️ {car?.reminders?.stats.urgent} გადაუდებელი
                     </div>
                   )}
                 </div>
