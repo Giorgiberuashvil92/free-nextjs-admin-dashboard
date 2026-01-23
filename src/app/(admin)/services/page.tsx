@@ -27,6 +27,7 @@ type Service = {
   createdAt?: string;
   latitude?: number;
   longitude?: number;
+  ownerId?: string;
 };
 
 // Fallback კატეგორიები
@@ -77,6 +78,7 @@ export default function ServicesAdminPage() {
     status: "active",
     latitude: "",
     longitude: "",
+    ownerId: "",
   });
 
   const load = async () => {
@@ -154,6 +156,7 @@ export default function ServicesAdminPage() {
       if (form.workingHours) payload.workingHours = form.workingHours;
       if (form.latitude) payload.latitude = parseFloat(form.latitude);
       if (form.longitude) payload.longitude = parseFloat(form.longitude);
+      if (form.ownerId) payload.ownerId = form.ownerId.trim();
 
       if (editingId) {
         await apiPatch(`/services/${editingId}`, payload);
@@ -183,6 +186,7 @@ export default function ServicesAdminPage() {
         status: "active",
         latitude: "",
         longitude: "",
+        ownerId: "",
       });
       load();
     } catch (e: unknown) {
@@ -194,7 +198,8 @@ export default function ServicesAdminPage() {
   };
 
   const handleEdit = (service: Service) => {
-    setEditingId(service.id || "");
+    const serviceId = service.id || service._id || "";
+    setEditingId(serviceId);
     setForm({
       name: service.name || "",
       description: service.description || "",
@@ -215,6 +220,7 @@ export default function ServicesAdminPage() {
       status: service.status || "active",
       latitude: service.latitude?.toString() || "",
       longitude: service.longitude?.toString() || "",
+      ownerId: service.ownerId || "",
     });
     setShowForm(true);
   };
@@ -261,6 +267,7 @@ export default function ServicesAdminPage() {
               status: "active",
               latitude: "",
               longitude: "",
+              ownerId: "",
             });
           }}
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -375,6 +382,19 @@ export default function ServicesAdminPage() {
                     placeholder="44.8271"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Owner ID
+                </label>
+                <input
+                  type="text"
+                  className="w-full border rounded px-3 py-2"
+                  value={form.ownerId}
+                  onChange={(e) => setForm({ ...form, ownerId: e.target.value })}
+                  placeholder="Owner User ID"
+                />
               </div>
 
               <div>
@@ -654,6 +674,11 @@ export default function ServicesAdminPage() {
                 {service.rating && (
                   <p className="text-sm text-gray-500 mb-2">
                     <span className="font-medium">რეიტინგი:</span> {service.rating} ⭐
+                  </p>
+                )}
+                {service.ownerId && (
+                  <p className="text-sm text-gray-500 mb-2">
+                    <span className="font-medium">Owner ID:</span> {service.ownerId}
                   </p>
                 )}
                 {service.description && (

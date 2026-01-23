@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { apiGetJson, apiPost, apiDelete, apiPatch } from "@/lib/api";
 import ImageUpload from "@/components/ImageUpload";
 
@@ -17,6 +17,26 @@ type Dismantler = {
   description?: string;
   photos?: string[];
   createdAt?: string;
+};
+
+type DismantlerStats = {
+  likesCount: number;
+  viewsCount: number;
+  callsCount: number;
+};
+
+type EngagementItem = {
+  userId: string;
+  userName?: string;
+  userPhone?: string;
+  userEmail?: string;
+  timestamp: number;
+};
+
+type EngagementData = {
+  likes: EngagementItem[];
+  views: EngagementItem[];
+  calls: EngagementItem[];
 };
 
 const LOCATIONS = ["თბილისი", "ბათუმი", "ქუთაისი", "რუსთავი", "გორი", "ზუგდიდი", "ფოთი", "ახალქალაქი", "ოზურგეთი", "ტყიბული", "სხვა"];
@@ -39,13 +59,49 @@ export default function DismantlersAdminPage() {
     photos: [] as string[],
   });
 
-  const load = async () => {
+  // Stats and Engagement
+  const [stats, setStats] = useState<Record<string, DismantlerStats>>({});
+  const [engagement, setEngagement] = useState<Record<string, EngagementData>>({});
+  const [loadingStats, setLoadingStats] = useState<Record<string, boolean>>({});
+  const [showEngagementModal, setShowEngagementModal] = useState<string | null>(null);
+  const [engagementTab, setEngagementTab] = useState<'views' | 'likes' | 'calls'>('views');
+  const loadingStatsRef = useRef<Set<string>>(new Set());
+
+  const loadStats = useCallback(async (dismantlerId: string) => {
+    // შევამოწმოთ ref-ით რომ არ იტვირთოს ორჯერ
+    if (loadingStatsRef.current.has(dismantlerId)) return;
+    
+    loadingStatsRef.current.add(dismantlerId);
+    setLoadingStats(prev => ({ ...prev, [dismantlerId]: true }));
+    
+    try {
+      const res = await apiGetJson<{ success: boolean; data: DismantlerStats }>(`/dismantlers/${dismantlerId}/stats`);
+      if (res.success && res.data) {
+        setStats(prev => ({ ...prev, [dismantlerId]: res.data }));
+      }
+    } catch (e) {
+      console.error('Failed to load stats:', e);
+    } finally {
+      setLoadingStats(prev => ({ ...prev, [dismantlerId]: false }));
+      loadingStatsRef.current.delete(dismantlerId);
+    }
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const res = await apiGetJson<{ success: boolean; data: Dismantler[] } | Dismantler[]>(`/dismantlers`);
       const data = Array.isArray(res) ? res : res.data;
-      setDismantlers((data || []).map((d) => ({ ...d, id: d.id || (d as any)._id })));
+      const dismantlersList = (data || []).map((d) => ({ ...d, id: d.id || (d as any)._id }));
+      setDismantlers(dismantlersList);
+      
+      // ავტომატურად ვიტვირთავთ სტატისტიკას ყველა დაშლილისთვის
+      dismantlersList.forEach((d) => {
+        if (d.id) {
+          loadStats(d.id);
+        }
+      });
     } catch (e: unknown) {
       const message = e && typeof e === "object" && "message" in e ? String((e as { message?: unknown }).message) : "Request failed";
       setError(message);
@@ -53,11 +109,43 @@ export default function DismantlersAdminPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loadStats]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
+
+  const loadEngagement = async (dismantlerId: string) => {
+    if (engagement[dismantlerId]) return;
+    
+    setLoadingStats(prev => ({ ...prev, [dismantlerId]: true }));
+    try {
+      const res = await apiGetJson<{ success: boolean; data: EngagementData }>(`/dismantlers/${dismantlerId}/engagement`);
+      if (res.success && res.data) {
+        setEngagement(prev => ({ ...prev, [dismantlerId]: res.data }));
+      }
+    } catch (e) {
+      console.error('Failed to load engagement:', e);
+    } finally {
+      setLoadingStats(prev => ({ ...prev, [dismantlerId]: false }));
+    }
+  };
+
+  const handleViewEngagement = async (dismantlerId: string) => {
+    setShowEngagementModal(dismantlerId);
+    await loadEngagement(dismantlerId);
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toLocaleString('ka-GE', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
 
   const normalizePhone = (phone: string) => {
     if (!phone) return "";
@@ -394,7 +482,38 @@ export default function DismantlersAdminPage() {
                     </div>
                   )}
 
+                  {/* Stats */}
+                  {d.id && (
+                    <div className="pt-2 border-t">
+                      {loadingStats[d.id] ? (
+                        <div className="text-xs text-gray-500">იტვირთება...</div>
+                      ) : stats[d.id] ? (
+                        <div className="flex items-center gap-3 text-xs">
+                          <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                            👁️ {stats[d.id].viewsCount}
+                          </span>
+                          <span className="px-2 py-1 rounded bg-red-50 text-red-700 border border-red-200">
+                            ❤️ {stats[d.id].likesCount}
+                          </span>
+                          <span className="px-2 py-1 rounded bg-green-50 text-green-700 border border-green-200">
+                            📞 {stats[d.id].callsCount}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400">სტატისტიკა არ არის</div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 pt-2">
+                    {d.id && (
+                      <button
+                        className="flex-1 text-sm px-3 py-1.5 border rounded hover:bg-blue-50 text-blue-600"
+                        onClick={() => handleViewEngagement(d.id!)}
+                      >
+                        Engagement
+                      </button>
+                    )}
                     <button
                       className="flex-1 text-sm px-3 py-1.5 border rounded hover:bg-gray-50"
                       onClick={() => handleEdit(d)}
@@ -415,6 +534,103 @@ export default function DismantlersAdminPage() {
           })
         )}
       </div>
+
+      {/* Engagement Modal */}
+      {showEngagementModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b flex items-center justify-between">
+              <h2 className="text-xl font-semibold">
+                Engagement - {dismantlers.find(d => d.id === showEngagementModal)?.name || showEngagementModal}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowEngagementModal(null);
+                  setEngagementTab('views');
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="border-b flex">
+              <button
+                onClick={() => setEngagementTab('views')}
+                className={`px-6 py-3 font-medium ${
+                  engagementTab === 'views'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Views ({engagement[showEngagementModal]?.views?.length || 0})
+              </button>
+              <button
+                onClick={() => setEngagementTab('likes')}
+                className={`px-6 py-3 font-medium ${
+                  engagementTab === 'likes'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Likes ({engagement[showEngagementModal]?.likes?.length || 0})
+              </button>
+              <button
+                onClick={() => setEngagementTab('calls')}
+                className={`px-6 py-3 font-medium ${
+                  engagementTab === 'calls'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                Calls ({engagement[showEngagementModal]?.calls?.length || 0})
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingStats[showEngagementModal] ? (
+                <div className="text-center py-8 text-gray-500">იტვირთება...</div>
+              ) : !engagement[showEngagementModal] ? (
+                <div className="text-center py-8 text-gray-500">მონაცემები არ მოიძებნა</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-3">მომხმარებელი ID</th>
+                        <th className="text-left p-3">სახელი</th>
+                        <th className="text-left p-3">ტელეფონი</th>
+                        <th className="text-left p-3">ელ. ფოსტა</th>
+                        <th className="text-left p-3">დრო</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(engagement[showEngagementModal]?.[engagementTab] || []).map((item, index) => (
+                        <tr key={`${item.userId}-${item.timestamp}-${index}`} className="border-b hover:bg-gray-50">
+                          <td className="p-3">{item.userId}</td>
+                          <td className="p-3">{item.userName || '-'}</td>
+                          <td className="p-3">{item.userPhone || '-'}</td>
+                          <td className="p-3">{item.userEmail || '-'}</td>
+                          <td className="p-3">{formatDate(item.timestamp)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {(!engagement[showEngagementModal]?.[engagementTab] || engagement[showEngagementModal][engagementTab].length === 0) && (
+                    <div className="text-center py-8 text-gray-500">
+                      {engagementTab === 'views' && 'Views არ არის'}
+                      {engagementTab === 'likes' && 'Likes არ არის'}
+                      {engagementTab === 'calls' && 'Calls არ არის'}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

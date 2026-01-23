@@ -33,8 +33,18 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "მომხმარებლის მოვლენები",
+    path: "/user-events",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "მომხმარებლები",
     path: "/users",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "მოთხოვნები",
+    path: "/requests",
   },
   {
     icon: <PieChartIcon />,
@@ -95,6 +105,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "ნაწილები",
     path: "/parts",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "მანქანის ბრენდები",
+    path: "/car-brands",
   },
   {
     icon: <PieChartIcon />,
