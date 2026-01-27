@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { getUserEvents, getAllUsersEvents, type UserEvent, type UserEventsResponse, type AllUsersEventsItem } from '@/services/analyticsApi';
 
-export default function UserEventsPage() {
+function UserEventsContent() {
   const searchParams = useSearchParams();
   const urlUserId = searchParams?.get('userId') || '';
   
@@ -703,5 +703,17 @@ export default function UserEventsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function UserEventsPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-6">
+        <div className="text-center py-8">იტვირთება...</div>
+      </div>
+    }>
+      <UserEventsContent />
+    </Suspense>
   );
 }
