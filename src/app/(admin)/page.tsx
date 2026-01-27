@@ -19,6 +19,7 @@ interface DashboardStats {
   activity: {
     totalLogins: number;
     loginsToday: number;
+    uniqueUsers: number;
     stories: number;
   };
   smsBalance?: {
@@ -71,6 +72,7 @@ export default function Dashboard() {
         activity: {
           totalLogins: loginStatsRes.status === 'fulfilled' ? (loginStatsRes.value.data?.totalLogins || 0) : 0,
           loginsToday: loginStatsRes.status === 'fulfilled' ? (loginStatsRes.value.data?.loginsToday || 0) : 0,
+          uniqueUsers: loginStatsRes.status === 'fulfilled' ? (loginStatsRes.value.data?.uniqueUsers || 0) : 0,
           stories: storiesRes.status === 'fulfilled' ? (storiesRes.value.data?.length || 0) : 0,
         },
         smsBalance: smsBalanceRes.status === 'fulfilled' && smsBalanceRes.value?.success
@@ -126,7 +128,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         {/* Users Card */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
           <div className="flex items-center justify-between mb-4">
@@ -171,13 +173,31 @@ export default function Dashboard() {
               <span className="text-2xl">🔐</span>
             </div>
             <div className="text-right">
-              <div className="text-xs opacity-80 mb-1">დალოგინება</div>
-              <div className="text-3xl font-bold">{stats.activity.totalLogins}</div>
+              <div className="text-xs opacity-80 mb-1">სულ შემოსვლები</div>
+              <div className="text-3xl font-bold">{stats.activity.totalLogins.toLocaleString()}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <span className="bg-white/20 px-2 py-1 rounded">
-              {stats.activity.loginsToday} დღეს
+              {stats.activity.loginsToday.toLocaleString()} დღეს
+            </span>
+          </div>
+        </div>
+
+        {/* Unique Users Card */}
+        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+              <span className="text-2xl">👤</span>
+            </div>
+            <div className="text-right">
+              <div className="text-xs opacity-80 mb-1">დაორგორი</div>
+              <div className="text-3xl font-bold">{stats.activity.uniqueUsers.toLocaleString()}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="bg-white/20 px-2 py-1 rounded">
+              უნიკალური იუზერები
             </span>
           </div>
         </div>

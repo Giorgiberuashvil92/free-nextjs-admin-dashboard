@@ -528,11 +528,16 @@ export default function LoginHistoryPage() {
 
   useEffect(() => {
     loadLoginHistory();
-    loadStats();
   }, [loadLoginHistory]);
+
+  useEffect(() => {
+    loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loginHistory.length]); // Recalculate stats when loginHistory changes
 
   const loadStats = async () => {
     try {
+      // Try with limit parameter to get all users
       const response = await apiGetJson<{
         success: boolean;
         data: {
@@ -550,10 +555,46 @@ export default function LoginHistoryPage() {
           }>;
         };
         message: string;
-      }>('/login-history/stats');
+      }>(`/login-history/stats?limit=10000`);
 
       if (response.success && response.data) {
-        setStats(response.data);
+        // If backend doesn't support limit, calculate from loginHistory
+        let loginsPerUserToday = response.data.loginsPerUserToday || [];
+        
+        // If we have less than uniqueUsersToday, calculate from loginHistory
+        if (loginsPerUserToday.length < response.data.uniqueUsersToday && loginHistory.length > 0) {
+          const todayStart = getGeorgiaTodayStart();
+          const tomorrowStart = new Date(todayStart);
+          tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+          
+          const todayLogins = loginHistory.filter(item => {
+            const loginDate = new Date(item.loginAt);
+            return loginDate >= todayStart && loginDate < tomorrowStart && item.status === 'success';
+          });
+          
+          // Count logins per user
+          const userLoginCounts: Record<string, { userId: string; phone: string; firstName?: string; count: number }> = {};
+          
+          todayLogins.forEach(login => {
+            if (!userLoginCounts[login.userId]) {
+              userLoginCounts[login.userId] = {
+                userId: login.userId,
+                phone: login.phone,
+                firstName: login.firstName,
+                count: 0
+              };
+            }
+            userLoginCounts[login.userId].count++;
+          });
+          
+          // Convert to array and sort by count (descending)
+          loginsPerUserToday = Object.values(userLoginCounts).sort((a, b) => b.count - a.count);
+        }
+        
+        setStats({
+          ...response.data,
+          loginsPerUserToday
+        });
       }
     } catch (error) {
       console.error('Error loading stats:', error);

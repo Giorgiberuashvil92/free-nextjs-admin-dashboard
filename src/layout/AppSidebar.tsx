@@ -38,6 +38,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "ყველაზე აქტიური იუზერები",
+    path: "/active-users",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "მომხმარებლები",
     path: "/users",
   },
@@ -158,6 +163,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "დღევანდელი შესვლები",
+    path: "/today-logins",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "საბსქრიფშენები",
     path: "/subscriptions",
   },
@@ -180,6 +190,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "ფიდბექები",
     path: "/feedback",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "CarFAX მოთხოვნები",
+    path: "/carfax-users",
   },
 ];
 

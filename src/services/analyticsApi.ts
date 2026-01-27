@@ -63,18 +63,31 @@ export async function getUserEvents(
 
 /**
  * Get events for all users
- * @param period - Time period: 'today' | 'week' | 'month' (default: 'week')
- * @param limit - Total events limit (default: 500)
+ * @param period - Time period: 'today' | 'week' | 'month' | 'all' (default: 'week')
+ * @param limit - Total events limit (default: 500, use 0 or undefined for no limit)
  */
 export async function getAllUsersEvents(
-  period: 'today' | 'week' | 'month' = 'week',
-  limit: number = 500
+  period: 'today' | 'week' | 'month' | 'all' = 'week',
+  limit?: number
 ): Promise<AllUsersEventsItem[]> {
-  const params = new URLSearchParams({
-    period,
-    limit: limit.toString(),
-  });
+  const params = new URLSearchParams();
+  
+  // თუ limit არის მითითებული და 0-ზე მეტია, ვამატებთ limit პარამეტრს
+  // თუ limit არ არის მითითებული ან 0-ია, limit პარამეტრს არ ვამატებთ (API-ს ყველა მონაცემი დააბრუნებს)
+  if (limit !== undefined && limit > 0) {
+    params.append('limit', limit.toString());
+  }
+  
+  // თუ period არის 'all', არ ვამატებთ period პარამეტრს
+  if (period !== 'all') {
+    params.append('period', period);
+  }
 
-  const response = await apiGetJson<AllUsersEventsItem[]>(`/analytics/all-users-events?${params.toString()}`);
+  const queryString = params.toString();
+  const url = queryString 
+    ? `/analytics/all-users-events?${queryString}`
+    : '/analytics/all-users-events';
+    
+  const response = await apiGetJson<AllUsersEventsItem[]>(url);
   return Array.isArray(response) ? response : [];
 }

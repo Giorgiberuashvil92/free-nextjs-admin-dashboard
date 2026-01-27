@@ -1,13 +1,17 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { getUserEvents, getAllUsersEvents, type UserEvent, type UserEventsResponse, type AllUsersEventsItem } from '@/services/analyticsApi';
 
 export default function UserEventsPage() {
-  const [viewMode, setViewMode] = useState<'all' | 'user'>('all');
+  const searchParams = useSearchParams();
+  const urlUserId = searchParams?.get('userId') || '';
+  
+  const [viewMode, setViewMode] = useState<'all' | 'user'>(urlUserId ? 'user' : 'all');
   const [period, setPeriod] = useState<'today' | 'week' | 'month'>('week');
   const [limit, setLimit] = useState<number>(500);
-  const [userId, setUserId] = useState<string>('');
+  const [userId, setUserId] = useState<string>(urlUserId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -57,6 +61,14 @@ export default function UserEventsPage() {
       setLoading(false);
     }
   }, [userId, period, limit]);
+
+  // Initialize from URL params
+  useEffect(() => {
+    if (urlUserId && !userId) {
+      setUserId(urlUserId);
+      setViewMode('user');
+    }
+  }, [urlUserId, userId]);
 
   useEffect(() => {
     if (viewMode === 'all') {
@@ -142,6 +154,7 @@ export default function UserEventsPage() {
     try {
       const date = typeof dateString === 'string' ? new Date(dateString) : new Date(dateString * 1000);
       return date.toLocaleString('ka-GE', {
+        timeZone: 'Asia/Tbilisi',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -152,6 +165,44 @@ export default function UserEventsPage() {
     } catch {
       return dateString.toString();
     }
+  };
+
+  // Event statistics
+  const eventStats = useMemo(() => {
+    if (!userEventsData?.events) return null;
+    
+    const stats = {
+      byType: {} as Record<string, number>,
+      byScreen: {} as Record<string, number>,
+      byName: {} as Record<string, number>,
+      total: userEventsData.events.length,
+    };
+    
+    userEventsData.events.forEach(event => {
+      stats.byType[event.eventType] = (stats.byType[event.eventType] || 0) + 1;
+      stats.byScreen[event.screen] = (stats.byScreen[event.screen] || 0) + 1;
+      stats.byName[event.eventName] = (stats.byName[event.eventName] || 0) + 1;
+    });
+    
+    return stats;
+  }, [userEventsData]);
+
+  // Format params for better display
+  const formatParams = (params: Record<string, any>): string => {
+    if (!params || Object.keys(params).length === 0) return '';
+    
+    const formatted: string[] = [];
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        if (typeof value === 'object') {
+          formatted.push(`${key}: ${JSON.stringify(value)}`);
+        } else {
+          formatted.push(`${key}: ${value}`);
+        }
+      }
+    });
+    
+    return formatted.join(', ');
   };
 
   return (
@@ -393,24 +444,83 @@ export default function UserEventsPage() {
           {/* Summary Section */}
           <div className="bg-white dark:bg-gray-800 border rounded-lg p-4 mb-4">
             <h2 className="text-xl font-semibold mb-3">სტატისტიკა</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <span className="font-medium">მოვლენების რაოდენობა:</span>{' '}
-                {userEventsData.totalEvents ?? filteredEvents.length}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                <div className="text-sm text-gray-600 dark:text-gray-400">მოვლენების რაოდენობა</div>
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {userEventsData.totalEvents ?? filteredEvents.length}
+                </div>
               </div>
               {userEventsData.firstEvent && (
-                <div>
-                  <span className="font-medium">პირველი მოვლენა:</span>{' '}
-                  {formatDate(userEventsData.firstEvent)}
+                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">პირველი მოვლენა</div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {formatDate(userEventsData.firstEvent)}
+                  </div>
                 </div>
               )}
               {userEventsData.lastEvent && (
-                <div>
-                  <span className="font-medium">ბოლო აქტივობა:</span>{' '}
-                  {formatDate(userEventsData.lastEvent)}
+                <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">ბოლო აქტივობა</div>
+                  <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {formatDate(userEventsData.lastEvent)}
+                  </div>
                 </div>
               )}
             </div>
+
+            {/* Event Statistics */}
+            {eventStats && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* By Type */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">ტიპების მიხედვით</h3>
+                  <div className="space-y-1">
+                    {Object.entries(eventStats.byType)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([type, count]) => (
+                        <div key={type} className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">{type}</span>
+                          <span className="font-semibold">{count}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* By Screen */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">ეკრანების მიხედვით</h3>
+                  <div className="space-y-1">
+                    {Object.entries(eventStats.byScreen)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([screen, count]) => (
+                        <div key={screen} className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400 truncate">{screen}</span>
+                          <span className="font-semibold">{count}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                {/* By Name */}
+                <div>
+                  <h3 className="text-sm font-semibold mb-2">მოვლენების მიხედვით</h3>
+                  <div className="space-y-1">
+                    {Object.entries(eventStats.byName)
+                      .sort((a, b) => b[1] - a[1])
+                      .slice(0, 5)
+                      .map(([name, count]) => (
+                        <div key={name} className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400 truncate">{name}</span>
+                          <span className="font-semibold">{count}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Filters and Actions */}
@@ -498,36 +608,57 @@ export default function UserEventsPage() {
                     {paginatedEvents.map((event) => (
                       <tr key={event.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="p-3">
-                          {event.dateFormatted || formatDate(event.date || event.timestamp)}
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {event.dateFormatted || formatDate(event.date || event.timestamp)}
+                          </div>
                         </td>
                         <td className="p-3">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            event.eventType === 'screen_view' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : event.eventType === 'button_click'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                              : event.eventType === 'api_call'
+                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
                             {event.eventType}
                           </span>
                         </td>
-                        <td className="p-3 font-medium">{event.eventName}</td>
-                        <td className="p-3">{event.screen}</td>
                         <td className="p-3">
-                          {event.paramsFormatted ? (
-                            <details>
-                              <summary className="cursor-pointer text-blue-600">
-                                ნახვა
+                          <div className="font-medium text-gray-900 dark:text-white">{event.eventName}</div>
+                          {formatParams(event.params || {}) && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md truncate">
+                              {formatParams(event.params || {})}
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded text-xs">
+                            {event.screen}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {Object.keys(event.params || {}).length > 0 ? (
+                            <details className="cursor-pointer">
+                              <summary className="text-blue-600 dark:text-blue-400 hover:underline text-sm">
+                                {Object.keys(event.params || {}).length} პარამეტრი
                               </summary>
-                              <pre className="mt-2 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-auto">
-                                {event.paramsFormatted}
-                              </pre>
-                            </details>
-                          ) : Object.keys(event.params || {}).length > 0 ? (
-                            <details>
-                              <summary className="cursor-pointer text-blue-600">
-                                ნახვა
-                              </summary>
-                              <pre className="mt-2 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-auto">
-                                {JSON.stringify(event.params, null, 2)}
-                              </pre>
+                              <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+                                <div className="space-y-1 text-xs">
+                                  {Object.entries(event.params || {}).map(([key, value]) => (
+                                    <div key={key} className="flex">
+                                      <span className="font-medium text-gray-700 dark:text-gray-300 min-w-[100px]">{key}:</span>
+                                      <span className="text-gray-600 dark:text-gray-400 break-all">
+                                        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                             </details>
                           ) : (
-                            <span className="text-gray-400">-</span>
+                            <span className="text-gray-400 text-sm">-</span>
                           )}
                         </td>
                       </tr>
