@@ -153,6 +153,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "რეფერალების ისტორია",
+    path: "/referrals-history",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "ჯანმრთელობა",
     path: "/health",
   },
@@ -185,6 +190,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "SMS მარკეტინგი",
     path: "/sms-marketing",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "Push Notifications",
+    path: "/push-notifications",
   },
   {
     icon: <PieChartIcon />,

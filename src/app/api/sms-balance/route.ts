@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import https from 'https';
 import querystring from 'querystring';
 
-const SMS_API_KEY = '65fa7f724d09ed5357688a00a643f657';
+const SMS_API_KEY = process.env.SMS_API_KEY || '65fa7f724d09ed5357688a00a643f657';
 
 export async function GET(): Promise<NextResponse> {
   return new Promise<NextResponse>((resolve) => {
