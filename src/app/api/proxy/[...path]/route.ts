@@ -1,21 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Get backend URL based on environment
-// Production: always use production URL
-// Development: use localhost if available, otherwise production
+// Always use production backend URL
 const getBackendUrl = (request: NextRequest): string => {
   // Environment variable override (highest priority)
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
   
-  // Check if request is from localhost (development)
-  const hostname = request.headers.get('host') || '';
-  if (hostname.includes('localhost') || hostname.includes('127.0.0.1')) {
-    return 'http://localhost:3000';
-  }
-  
-  // Production: use production backend
+  // Always use production backend
   return 'https://marte-backend-production.up.railway.app';
 };
 
