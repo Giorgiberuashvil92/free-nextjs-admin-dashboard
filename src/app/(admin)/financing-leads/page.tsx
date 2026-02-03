@@ -15,7 +15,10 @@ type Lead = {
   createdAt: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:3000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app";
+const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+  ? '/api/financing/leads' 
+  : `${BACKEND_URL}/financing/leads`;
 
 export default function FinancingLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -28,10 +31,13 @@ export default function FinancingLeadsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/financing/leads?limit=200`, { cache: "no-store" });
+        const res = await fetch(`${API_BASE}?limit=200`, { cache: "no-store" });
         const data = await res.json();
-        setLeads(Array.isArray(data) ? data : []);
-      } catch {
+        // Handle both array response and { data: [...] } format
+        const leadsData = Array.isArray(data) ? data : (data?.data || []);
+        setLeads(leadsData);
+      } catch (error) {
+        console.error("Error loading financing leads:", error);
         setLeads([]);
       } finally {
         setLoading(false);
@@ -57,9 +63,12 @@ export default function FinancingLeadsPage() {
     let cancelled = false;
     (async () => {
       const entries: [string, { name: string; phone?: string }][] = [];
+      const usersApiBase = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+        ? '/api/proxy' 
+        : BACKEND_URL;
       for (const id of missing) {
         try {
-          const res = await fetch(`${API_BASE}/users/${encodeURIComponent(id)}`, { cache: "no-store" });
+          const res = await fetch(`${usersApiBase}/users/${encodeURIComponent(id)}`, { cache: "no-store" });
           if (!res.ok) continue;
           const json = await res.json();
           const u = json?.data || {};

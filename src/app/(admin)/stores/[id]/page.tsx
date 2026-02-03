@@ -53,6 +53,7 @@ type StoreDetail = {
   paymentPeriod?: string;
   createdAt?: string;
   updatedAt?: string;
+  isVip?: boolean;
 };
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app";
@@ -164,8 +165,49 @@ export default function StoreDetailPage() {
               მოლოდინში
             </span>
           )}
+          {/* VIP Badge */}
+          {data.isVip && (
+            <span className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs px-2 py-1 rounded font-bold shadow-lg">
+              ⭐ VIP
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {/* VIP Toggle Button - ყველა მაღაზიისთვის */}
+          {(
+            <button
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!id) return;
+                try {
+                  const newVipStatus = !data.isVip;
+                  const res = await fetch(`${API_BASE}/stores/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isVip: newVipStatus }),
+                  });
+                  if (res.ok) {
+                    const updated = await res.json();
+                    setData({ ...data, isVip: newVipStatus });
+                    alert(newVipStatus ? 'VIP სტატუსი ჩართულია' : 'VIP სტატუსი გამორთულია');
+                  } else {
+                    const errorData = await res.json().catch(() => ({}));
+                    alert(errorData.message || 'VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                  }
+                } catch (error) {
+                  console.error('Error updating VIP status:', error);
+                  alert('VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                }
+              }}
+              className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+                data.isVip
+                  ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+              }`}
+            >
+              {data.isVip ? '⭐ VIP-ის მოხსნა' : 'VIP-ად დანიშვნა'}
+            </button>
+          )}
           {editing ? (
             <>
               <button
@@ -334,6 +376,21 @@ export default function StoreDetailPage() {
                   ))}
                 </select>
               </div>
+              {/* VIP Checkbox - ყველა მაღაზიისთვის */}
+              {(
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isVip"
+                    checked={data.isVip || false}
+                    onChange={(e) => setData({ ...data, isVip: e.target.checked })}
+                    className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                  />
+                  <label htmlFor="isVip" className="text-xs text-gray-700 font-medium cursor-pointer">
+                    ⭐ VIP სტატუსი
+                  </label>
+                </div>
+              )}
               <div>
                 <label className="text-xs text-gray-500">Owner ID</label>
                 <input
@@ -446,7 +503,58 @@ export default function StoreDetailPage() {
                     მოლოდინში
                   </span>
                 )}
+                {/* VIP Badge */}
+                {data.isVip && (
+                  <span className="text-xs px-2 py-0.5 rounded bg-gradient-to-r from-yellow-400 to-yellow-600 text-white font-bold shadow-md">
+                    ⭐ VIP
+                  </span>
+                )}
               </div>
+              {/* VIP Toggle Section - ყველა მაღაზიისთვის */}
+              {(
+                <div className="pt-3 border-t mt-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-gray-600 dark:text-gray-400">
+                      <span className="font-medium">VIP სტატუსი:</span>
+                      <span className={`ml-2 font-semibold ${data.isVip ? 'text-yellow-600' : 'text-gray-400'}`}>
+                        {data.isVip ? '⭐ VIP' : 'არ არის VIP'}
+                      </span>
+                    </div>
+                    <button
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        if (!id) return;
+                        try {
+                          const newVipStatus = !data.isVip;
+                          const res = await fetch(`${API_BASE}/stores/${id}`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ isVip: newVipStatus }),
+                          });
+                          if (res.ok) {
+                            const updated = await res.json();
+                            setData({ ...data, isVip: newVipStatus });
+                            alert(newVipStatus ? 'VIP სტატუსი ჩართულია' : 'VIP სტატუსი გამორთულია');
+                          } else {
+                            const errorData = await res.json().catch(() => ({}));
+                            alert(errorData.message || 'VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                          }
+                        } catch (error) {
+                          console.error('Error updating VIP status:', error);
+                          alert('VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                        }
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+                        data.isVip
+                          ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                      }`}
+                    >
+                      {data.isVip ? 'VIP-ის მოხსნა' : 'VIP-ად დანიშვნა'}
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-medium">Owner:</span> {data.ownerId || "-"}

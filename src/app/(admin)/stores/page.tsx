@@ -28,6 +28,7 @@ type Store = {
   likesCount?: number;
   viewsCount?: number;
   callsCount?: number;
+  isVip?: boolean;
 };
 
 type EngagementUser = {
@@ -52,6 +53,7 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
 export default function StoresListPage() {
   const [rows, setRows] = useState<Store[]>([]);
   const [ownerId, setOwnerId] = useState("");
+  const [showOnlyVip, setShowOnlyVip] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
@@ -66,18 +68,21 @@ export default function StoresListPage() {
   const load = useCallback(async () => {
     setLoading(true); setErr("");
     try {
-      // Admin panel-ში ყოველთვის ვითხოვთ ყველა მაღაზიას (includeAll=true)
       const params = new URLSearchParams();
       if (ownerId) {
         params.append('ownerId', ownerId);
       }
-      params.append('includeAll', 'true'); // Admin panel-ისთვის ყველა მაღაზია
+      params.append('includeAll', 'true'); 
       const qs = params.toString() ? `?${params.toString()}` : "";
       const res = await apiGetJson<{ success: boolean; data: Store[] } | Store[]>(`/stores${qs}`);
+      console.log('🔍 API Response:', res);
       const data = Array.isArray(res) ? res : res.data;
+      console.log('📦 Parsed Data:', data);
       const stores = (data || []).map((s)=> ({ ...s, id: s.id || (s as any)._id }));
+      console.log('🏪 Stores after mapping:', stores);
+      console.log('⭐ VIP Stores:', stores.filter(s => s.isVip));
+      console.log('🏬 Type "მაღაზია" stores:', stores.filter(s => s.type === 'მაღაზია'));
       
-      // ჩატვირთე სტატისტიკა თითოეული მაღაზიისთვის
       const storesWithStats = await Promise.all(
         stores.map(async (store) => {
           if (!store.id) return store;
@@ -241,6 +246,18 @@ export default function StoresListPage() {
               onChange={(e)=>setOwnerId(e.target.value)} 
             />
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="showOnlyVip"
+              checked={showOnlyVip}
+              onChange={(e) => setShowOnlyVip(e.target.checked)}
+              className="w-4 h-4 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+            />
+            <label htmlFor="showOnlyVip" className="text-sm text-gray-700 font-medium cursor-pointer">
+              ⭐ მხოლოდ VIP
+            </label>
+          </div>
           <button className="px-3 py-2 bg-black text-white rounded" onClick={load} disabled={loading}>
             Apply
           </button>
@@ -256,17 +273,33 @@ export default function StoresListPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {loading ? (
           <div className="col-span-full text-center text-gray-500 py-10">Loading…</div>
-        ) : rows.length === 0 ? (
-          <div className="col-span-full text-center text-gray-500 py-10">No stores</div>
-        ) : (
-          rows.map((s) => {
+        ) : (() => {
+          // Filter and sort: VIP first, then filter by showOnlyVip
+          let filteredRows = rows;
+          if (showOnlyVip) {
+            filteredRows = rows.filter(s => s.isVip === true);
+          }
+          // Sort: VIP first
+          filteredRows = [...filteredRows].sort((a, b) => {
+            if (a.isVip && !b.isVip) return -1;
+            if (!a.isVip && b.isVip) return 1;
+            return 0;
+          });
+          
+          if (filteredRows.length === 0) {
+            return <div className="col-span-full text-center text-gray-500 py-10">No stores</div>;
+          }
+          
+          return filteredRows.map((s) => {
             const img = s.images?.[0];
             const storeName = s.title || s.name || "Unnamed Store";
             return (
               <Link 
                 key={s.id} 
                 href={`/stores/${s.id}`}
-                className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+                className={`border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow ${
+                  s.isVip ? 'border-yellow-400 border-2 shadow-lg ring-2 ring-yellow-200' : ''
+                }`}
               >
                 <div className="relative h-48 bg-gray-100">
                   {img ? (
@@ -288,8 +321,14 @@ export default function StoresListPage() {
                       {s.type}
                     </div>
                   )}
+                  {/* VIP Badge */}
+                  {s.isVip && (
+                    <div className="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs px-2 py-1 rounded font-bold shadow-lg z-10">
+                      ⭐ VIP
+                    </div>
+                  )}
                   {/* Status Badge */}
-                  <div className="absolute top-2 right-2">
+                  <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
                     {s.status === 'active' && (
                       <span className="bg-green-500 text-white text-xs px-2 py-1 rounded font-medium">
                         აქტიური
@@ -468,6 +507,70 @@ export default function StoresListPage() {
                     </div>
                   </div>
 
+                  {/* VIP Toggle - გადახდის ინფორმაციის ზემოთ, ყველა მაღაზიისთვის */}
+                  {(
+                    <div className="mt-3 pt-3 border-t">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          <span className="font-medium">VIP სტატუსი:</span>
+                          <span className={`ml-2 font-semibold ${s.isVip ? 'text-yellow-600' : 'text-gray-400'}`}>
+                            {s.isVip ? '⭐ VIP' : 'არ არის VIP'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!s.id) return;
+                            
+                            const newVipStatus = !s.isVip;
+                            // Optimistic update
+                            setRows(rows.map(store => 
+                              store.id === s.id ? { ...store, isVip: newVipStatus } : store
+                            ));
+                            
+                            try {
+                              const res = await fetch(`${API_BASE}/stores/${s.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ isVip: newVipStatus }),
+                              });
+                              
+                              if (res.ok) {
+                                const updated = await res.json();
+                                // Update with server response
+                                setRows(rows.map(store => 
+                                  store.id === s.id ? { ...store, isVip: updated?.data?.isVip ?? newVipStatus } : store
+                                ));
+                              } else {
+                                // Revert on error
+                                setRows(rows.map(store => 
+                                  store.id === s.id ? { ...store, isVip: s.isVip } : store
+                                ));
+                                const errorData = await res.json().catch(() => ({}));
+                                alert(errorData.message || 'VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                              }
+                            } catch (error) {
+                              // Revert on error
+                              setRows(rows.map(store => 
+                                store.id === s.id ? { ...store, isVip: s.isVip } : store
+                              ));
+                              console.error('Error updating VIP status:', error);
+                              alert('VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                            }
+                          }}
+                          className={`text-xs px-3 py-1.5 rounded font-medium transition-colors ${
+                            s.isVip
+                              ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border border-yellow-300'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300'
+                          }`}
+                        >
+                          {s.isVip ? 'VIP-ის მოხსნა' : 'VIP-ად დანიშვნა'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Payment Information */}
                   <div className="mt-3 pt-3 border-t">
                     <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
@@ -570,7 +673,7 @@ export default function StoresListPage() {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Owner Info & Assign Button */}
                   <div className="mt-3 pt-3 border-t">
                     {s.ownerId ? (
@@ -597,8 +700,8 @@ export default function StoresListPage() {
                 </div>
               </Link>
             );
-          })
-        )}
+          });
+        })()}
       </div>
 
       {/* Assign Owner Modal */}

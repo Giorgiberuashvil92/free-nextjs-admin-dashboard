@@ -369,3 +369,193 @@ Frontend ავტომატურად ცდის სხვადასხ
 2. **Medium:** Engagement endpoint-ები (დეტალებისთვის)
 3. **Low:** Tracking POST endpoint-ები (თუ აპლიკაციაში უკვე არის tracking)
 
+---
+
+# Backend API Requirements - VIP სტატუსი მაღაზიებზე
+
+## მიზანი
+Frontend-ს სჭირდება VIP სტატუსის მართვის ფუნქციონალი მაღაზიებზე. VIP სტატუსი ხელმისაწვდომია **მხოლოდ დაშლილების** (type === 'დაშლილები') ტიპის მაღაზიებისთვის.
+
+## 1. Store Model-ში ველის დამატება
+
+### MongoDB Schema:
+```javascript
+{
+  // ... existing fields ...
+  isVip: {
+    type: Boolean,
+    default: false
+  }
+}
+```
+
+**მნიშვნელობა:**
+- `isVip: true` - მაღაზიას აქვს VIP სტატუსი
+- `isVip: false` - მაღაზიას არ აქვს VIP სტატუსი (default)
+- VIP სტატუსი გამოიყენება მხოლოდ `type === 'დაშლილები'` მაღაზიებისთვის
+
+---
+
+## 2. API Endpoint-ების განახლება
+
+### 2.1. GET /stores - მაღაზიების სია
+
+**მოთხოვნა:** დააბრუნოს `isVip` ველი თითოეულ მაღაზიაში
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "store_123",
+      "name": "მაღაზიის სახელი",
+      "type": "დაშლილები",
+      "isVip": true,
+      // ... other fields ...
+    },
+    {
+      "id": "store_456",
+      "name": "სხვა მაღაზია",
+      "type": "მაღაზია",
+      "isVip": false,
+      // ... other fields ...
+    }
+  ]
+}
+```
+
+### 2.2. GET /stores/{storeId} - ერთი მაღაზიის დეტალები
+
+**მოთხოვნა:** დააბრუნოს `isVip` ველი
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "store_123",
+    "name": "მაღაზიის სახელი",
+    "type": "დაშლილები",
+    "isVip": true,
+    // ... other fields ...
+  }
+}
+```
+
+### 2.3. PATCH /stores/{storeId} - VIP სტატუსის განახლება
+
+**მოთხოვნა:** მიიღოს და განაახლოს `isVip` ველი
+
+**Request Body:**
+```json
+{
+  "isVip": true
+}
+```
+
+ან:
+```json
+{
+  "isVip": false
+}
+```
+
+**Response Format:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "store_123",
+    "name": "მაღაზიის სახელი",
+    "type": "დაშლილები",
+    "isVip": true,
+    // ... other fields ...
+  }
+}
+```
+
+**Validation:**
+- VIP სტატუსი შეიძლება დაყენდეს/მოიხსნას მხოლოდ `type === 'დაშლილები'` მაღაზიებისთვის
+- თუ მაღაზიის `type` არ არის 'დაშლილები', დააბრუნეთ error:
+  ```json
+  {
+    "success": false,
+    "error": "VIP სტატუსი ხელმისაწვდომია მხოლოდ დაშლილების ტიპის მაღაზიებისთვის",
+    "code": 400
+  }
+  ```
+
+---
+
+## 3. Frontend-ის მოთხოვნები
+
+Frontend აკეთებს შემდეგ request-ს VIP სტატუსის შესაცვლელად:
+
+```javascript
+PATCH /stores/{storeId}
+Content-Type: application/json
+
+{
+  "isVip": true  // ან false
+}
+```
+
+**მდებარეობა:** 
+- VIP toggle button გამოჩნდება მხოლოდ `type === 'დაშლილები'` მაღაზიებისთვის
+- VIP badge გამოჩნდება მხოლოდ `type === 'დაშლილები' && isVip === true` მაღაზიებისთვის
+
+---
+
+## 4. Error Handling
+
+### Store არ არსებობს:
+```json
+{
+  "success": false,
+  "error": "Store not found",
+  "code": 404
+}
+```
+
+### VIP სტატუსი არასწორი ტიპის მაღაზიაზე:
+```json
+{
+  "success": false,
+  "error": "VIP სტატუსი ხელმისაწვდომია მხოლოდ დაშლილების ტიპის მაღაზიებისთვის",
+  "code": 400
+}
+```
+
+### Validation Error:
+```json
+{
+  "success": false,
+  "error": "Invalid request body",
+  "code": 400
+}
+```
+
+---
+
+## 5. შეჯამება
+
+**საჭირო ცვლილებები:**
+
+1. ✅ **Store Model-ში:**
+   - დაამატეთ `isVip: Boolean` ველი (default: false)
+
+2. ✅ **GET /stores endpoint:**
+   - დააბრუნეთ `isVip` ველი თითოეულ მაღაზიაში
+
+3. ✅ **GET /stores/{storeId} endpoint:**
+   - დააბრუნეთ `isVip` ველი
+
+4. ✅ **PATCH /stores/{storeId} endpoint:**
+   - მიიღეთ `isVip` ველი request body-ში
+   - განაახლეთ `isVip` ველი
+   - დაამატეთ validation: VIP მხოლოდ 'დაშლილები' ტიპისთვის
+   - დააბრუნეთ განახლებული მაღაზია `isVip` ველით
+
+**Priority:**
+- **High:** VIP სტატუსის მართვა აუცილებელია admin panel-ისთვის

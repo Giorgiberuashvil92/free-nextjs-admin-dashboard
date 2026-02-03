@@ -17,6 +17,7 @@ type Dismantler = {
   description?: string;
   photos?: string[];
   createdAt?: string;
+  isVip?: boolean;
 };
 
 type DismantlerStats = {
@@ -57,6 +58,7 @@ export default function DismantlersAdminPage() {
     location: "",
     description: "",
     photos: [] as string[],
+    isVip: false,
   });
 
   // Stats and Engagement
@@ -176,6 +178,7 @@ export default function DismantlersAdminPage() {
         location: form.location,
         description: form.description.trim() || undefined,
         photos: form.photos.filter(Boolean),
+        isVip: form.isVip || false,
       };
       if (editing?.id) {
         await apiPatch(`/dismantlers/${editing.id}`, payload);
@@ -192,6 +195,7 @@ export default function DismantlersAdminPage() {
         location: "",
         description: "",
         photos: [],
+        isVip: false,
       });
       setEditing(null);
       setShowForm(false);
@@ -217,6 +221,7 @@ export default function DismantlersAdminPage() {
       location: dismantler.location || "",
       description: dismantler.description || "",
       photos: dismantler.photos || [],
+      isVip: dismantler.isVip || false,
     });
     setShowForm(true);
   };
@@ -261,6 +266,7 @@ export default function DismantlersAdminPage() {
               location: "",
               description: "",
               photos: [],
+              isVip: false,
             });
             setShowForm(!showForm);
           }}
@@ -402,6 +408,31 @@ export default function DismantlersAdminPage() {
               label="ფოტოები"
             />
 
+            {/* VIP Checkbox */}
+            <div className="border-t pt-4 mt-4">
+              <div className="flex items-center gap-3 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <label className="flex items-center gap-3 cursor-pointer flex-1">
+                  <input
+                    type="checkbox"
+                    checked={form.isVip}
+                    onChange={(e) => setForm({ ...form, isVip: e.target.checked })}
+                    className="w-5 h-5 text-yellow-600 border-gray-300 rounded focus:ring-yellow-500"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⭐</span>
+                    <span className="text-base font-semibold text-gray-900">
+                      VIP სტატუსი
+                    </span>
+                  </div>
+                </label>
+                {form.isVip && (
+                  <span className="px-3 py-1 bg-yellow-600 text-white text-sm font-bold rounded-full">
+                    VIP აქტიურია
+                  </span>
+                )}
+              </div>
+            </div>
+
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
@@ -426,6 +457,7 @@ export default function DismantlersAdminPage() {
                     location: "",
                     description: "",
                     photos: [],
+                    isVip: false,
                   });
                 }}
               >
@@ -445,12 +477,18 @@ export default function DismantlersAdminPage() {
           dismantlers.map((d) => {
             const img = d.photos?.[0];
             return (
-              <div key={d.id} className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+              <div key={d.id} className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow relative">
                 {img ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={img} alt="cover" className="w-full h-40 object-cover" />
                 ) : (
                   <div className="w-full h-40 bg-gray-100 flex items-center justify-center text-gray-400">სურათი არ არის</div>
+                )}
+                {/* VIP Badge */}
+                {d.isVip && (
+                  <div className="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-yellow-600 text-white text-xs px-2 py-1 rounded font-bold shadow-lg z-10">
+                    ⭐ VIP
+                  </div>
                 )}
                 <div className="p-4 space-y-3">
                   <div className="flex items-start justify-between gap-3">
@@ -520,6 +558,32 @@ export default function DismantlersAdminPage() {
                     >
                       რედაქტირება
                     </button>
+                    {d.id && (
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (!d.id) return;
+                          try {
+                            const newVipStatus = !d.isVip;
+                            await apiPatch(`/dismantlers/${d.id}`, { isVip: newVipStatus });
+                            setDismantlers(dismantlers.map(dismantler => 
+                              dismantler.id === d.id ? { ...dismantler, isVip: newVipStatus } : dismantler
+                            ));
+                          } catch (error) {
+                            console.error('Error updating VIP status:', error);
+                            alert('VIP სტატუსის შეცვლა ვერ მოხერხდა');
+                          }
+                        }}
+                        className={`flex-1 text-sm px-3 py-1.5 border rounded font-medium transition-colors ${
+                          d.isVip
+                            ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-yellow-300'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-300'
+                        }`}
+                      >
+                        {d.isVip ? '⭐ VIP' : 'VIP'}
+                      </button>
+                    )}
                     <button
                       className="flex-1 text-sm px-3 py-1.5 border rounded text-red-600 hover:bg-red-50"
                       onClick={() => handleDelete(d.id!)}
