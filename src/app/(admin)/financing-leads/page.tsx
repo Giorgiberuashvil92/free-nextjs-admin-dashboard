@@ -17,8 +17,8 @@ type Lead = {
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app";
 const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-  ? '/api/financing/leads' 
-  : `${BACKEND_URL}/financing/leads`;
+  ? '/api/proxy' 
+  : BACKEND_URL;
 
 export default function FinancingLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -31,7 +31,7 @@ export default function FinancingLeadsPage() {
     const load = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}?limit=200`, { cache: "no-store" });
+        const res = await fetch(`${API_BASE}/financing/leads?limit=200`, { cache: "no-store" });
         const data = await res.json();
         // Handle both array response and { data: [...] } format
         const leadsData = Array.isArray(data) ? data : (data?.data || []);
