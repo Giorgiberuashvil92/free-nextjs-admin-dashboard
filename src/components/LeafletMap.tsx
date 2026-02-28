@@ -30,7 +30,7 @@ if (typeof window !== "undefined") {
 // Map click handler component
 function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
   useMapEvents({
-    click: (e) => {
+    click: (e: any) => {
       onMapClick(e.latlng.lat, e.latlng.lng);
     },
   });

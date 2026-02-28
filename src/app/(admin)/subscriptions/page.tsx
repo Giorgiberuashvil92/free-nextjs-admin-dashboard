@@ -75,6 +75,8 @@ interface UpcomingPayment {
   currency: string;
   nextBillingDate: string;
   timeUntilBilling: string;
+  isRejectedPayment?: boolean;
+  rejectReason?: string;
 }
 
 export default function SubscriptionsPage() {
@@ -105,6 +107,7 @@ export default function SubscriptionsPage() {
   useEffect(() => {
     fetchSubscriptions();
     fetchUpcomingPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch rejected payments for all subscriptions
@@ -199,16 +202,31 @@ export default function SubscriptionsPage() {
             
             if (response.ok) {
               const data = await response.json();
-              const payments = (data.data || data || []).filter((p: Payment) => 
+              const allPayments = (data.data || data || []).filter((p: Payment) => 
                 (p.context === 'subscription' || 
                  p.context === 'test_subscription' ||
                  p.metadata?.planId === subscription.planId) &&
-                p.status === 'rejected' &&
                 p.isRecurring === true
               );
               
-              if (payments.length > 0) {
-                rejectedPayments[subscription._id] = payments;
+              // Find rejected payments that don't have a completed payment after them
+              const rejected = allPayments.filter((p: Payment) => {
+                if (p.status !== 'rejected') return false;
+                
+                // Check if there's a completed payment after this rejected payment
+                const rejectedDate = new Date(p.paymentDate).getTime();
+                const hasCompletedAfter = allPayments.some((other: Payment) => {
+                  if (other.status !== 'completed' && other.status !== 'success') return false;
+                  const otherDate = new Date(other.paymentDate).getTime();
+                  return otherDate > rejectedDate;
+                });
+                
+                // Only show rejected payment if there's no completed payment after it
+                return !hasCompletedAfter;
+              });
+              
+              if (rejected.length > 0) {
+                rejectedPayments[subscription._id] = rejected;
               }
             }
           } catch (err) {
@@ -295,9 +313,77 @@ export default function SubscriptionsPage() {
       }
 
       const data = await response.json();
+      let upcoming: UpcomingPayment[] = [];
+      
       if (data.success && data.data?.upcoming) {
-        setUpcomingPayments(data.data.upcoming);
+        upcoming = data.data.upcoming;
       }
+
+      // Add subscriptions with unpaid rejected payments
+      const unpaidRejectedPayments: UpcomingPayment[] = [];
+      
+      for (const subscription of subscriptions) {
+        const rejectedPayments = rejectedPaymentsMap[subscription._id] || [];
+        
+        if (rejectedPayments.length > 0) {
+          // Get the latest rejected payment
+          const latestRejected = rejectedPayments.sort((a, b) => 
+            new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+          )[0];
+          
+          // Check if there's a completed payment after this rejected payment
+          try {
+            const paymentResponse = await fetch(`${API_BASE}/api/payments/user/${subscription.userId}?t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { 'Cache-Control': 'no-cache' },
+            });
+            
+            if (paymentResponse.ok) {
+              const paymentData = await paymentResponse.json();
+              const allPayments = (paymentData.data || paymentData || []).filter((p: Payment) => 
+                (p.context === 'subscription' || 
+                 p.context === 'test_subscription' ||
+                 p.metadata?.planId === subscription.planId) &&
+                p.isRecurring === true
+              );
+              
+              const rejectedDate = new Date(latestRejected.paymentDate).getTime();
+              const hasCompletedAfter = allPayments.some((other: Payment) => {
+                if (other.status !== 'completed' && other.status !== 'success') return false;
+                const otherDate = new Date(other.paymentDate).getTime();
+                return otherDate > rejectedDate;
+              });
+              
+              // Only add if there's no completed payment after the rejected one
+              if (!hasCompletedAfter) {
+                const rejectedDateObj = new Date(latestRejected.paymentDate);
+                const now = new Date();
+                const timeDiff = rejectedDateObj.getTime() - now.getTime();
+                const daysDiff = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
+                
+                unpaidRejectedPayments.push({
+                  subscriptionId: subscription._id,
+                  userId: subscription.userId,
+                  planName: subscription.planName,
+                  amount: latestRejected.amount,
+                  currency: latestRejected.currency,
+                  nextBillingDate: latestRejected.paymentDate,
+                  timeUntilBilling: daysDiff >= 0 
+                    ? `${daysDiff} დღე` 
+                    : `${Math.abs(daysDiff)} დღე წარსულში`,
+                  isRejectedPayment: true,
+                  rejectReason: latestRejected.codeDescription || latestRejected.metadata?.bogCallbackData?.reject_reason || 'Unknown reason',
+                });
+              }
+            }
+          } catch (err) {
+            console.error(`Error checking payments for subscription ${subscription._id}:`, err);
+          }
+        }
+      }
+      
+      // Combine upcoming payments with unpaid rejected payments
+      setUpcomingPayments([...upcoming, ...unpaidRejectedPayments]);
     } catch (err) {
       console.error("Error fetching upcoming payments:", err);
     } finally {
@@ -417,7 +503,7 @@ export default function SubscriptionsPage() {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">მომდინარე გადახდები (7 დღე)</h3>
             <p className="text-sm text-gray-600">
-              გადახდები რომლებიც მომდინარე 7 დღის განმავლობაში უნდა ჩამოვაჭრათ
+              გადახდები რომლებიც მომდინარე 7 დღის განმავლობაში უნდა ჩამოვაჭრათ ან გადაუხდელი rejected payments-ები
             </p>
           </div>
           <button
@@ -453,6 +539,9 @@ export default function SubscriptionsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     დარჩენილი დრო
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    სტატუსი
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -462,7 +551,7 @@ export default function SubscriptionsPage() {
                   const isOverdue = nextBillingDate <= now;
                   
                   return (
-                    <tr key={payment.subscriptionId} className={`hover:bg-gray-50 ${isOverdue ? 'bg-red-50' : ''}`}>
+                    <tr key={payment.subscriptionId} className={`hover:bg-gray-50 ${isOverdue || payment.isRejectedPayment ? 'bg-red-50' : ''}`}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         <a 
                           href={`/users?q=${encodeURIComponent(payment.userId)}`}
@@ -477,18 +566,47 @@ export default function SubscriptionsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {payment.amount} {payment.currency}
+                        {payment.isRejectedPayment && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                              ⚠️ გადაუხდელი
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(payment.nextBillingDate)}
+                        {payment.isRejectedPayment && isOverdue && (
+                          <div className="text-xs text-red-600 mt-1">(წარსულში)</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          isOverdue 
+                          isOverdue || payment.isRejectedPayment
                             ? 'bg-red-100 text-red-800' 
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {isOverdue ? '⏰ ვადა გასული' : payment.timeUntilBilling}
+                          {isOverdue || payment.isRejectedPayment ? '⏰ ვადა გასული' : payment.timeUntilBilling}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {payment.isRejectedPayment ? (
+                          <div className="space-y-1">
+                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                              ⚠️ Rejected Payment
+                            </span>
+                            {payment.rejectReason && (
+                              <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                                <div className="font-semibold text-red-800">მიზეზი:</div>
+                                <div className="text-red-700 mt-0.5">{payment.rejectReason}</div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                            მომდინარე
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
