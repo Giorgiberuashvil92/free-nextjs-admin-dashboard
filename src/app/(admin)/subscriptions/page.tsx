@@ -58,6 +58,10 @@ interface Payment {
     planPrice?: string;
     planCurrency?: string;
     planPeriod?: string;
+    bogCallbackData?: {
+      reject_reason?: string;
+      order_status?: string;
+    };
   };
   createdAt: string;
   updatedAt: string;
@@ -96,11 +100,20 @@ export default function SubscriptionsPage() {
   const [subscriptionPayments, setSubscriptionPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [updatingToken, setUpdatingToken] = useState<string | null>(null);
+  const [rejectedPaymentsMap, setRejectedPaymentsMap] = useState<Record<string, Payment[]>>({});
 
   useEffect(() => {
     fetchSubscriptions();
     fetchUpcomingPayments();
   }, []);
+
+  // Fetch rejected payments for all subscriptions
+  useEffect(() => {
+    if (subscriptions.length > 0) {
+      fetchRejectedPaymentsForSubscriptions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subscriptions]);
 
   const fetchSubscriptions = async () => {
     try {
@@ -169,6 +182,45 @@ export default function SubscriptionsPage() {
       minute: "2-digit",
       second: "2-digit",
     });
+  };
+
+  const fetchRejectedPaymentsForSubscriptions = async () => {
+    try {
+      const rejectedPayments: Record<string, Payment[]> = {};
+      
+      // Fetch rejected payments for each subscription
+      await Promise.all(
+        subscriptions.map(async (subscription) => {
+          try {
+            const response = await fetch(`${API_BASE}/api/payments/user/${subscription.userId}?t=${Date.now()}`, {
+              cache: "no-store",
+              headers: { 'Cache-Control': 'no-cache' },
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              const payments = (data.data || data || []).filter((p: Payment) => 
+                (p.context === 'subscription' || 
+                 p.context === 'test_subscription' ||
+                 p.metadata?.planId === subscription.planId) &&
+                p.status === 'rejected' &&
+                p.isRecurring === true
+              );
+              
+              if (payments.length > 0) {
+                rejectedPayments[subscription._id] = payments;
+              }
+            }
+          } catch (err) {
+            console.error(`Error fetching rejected payments for subscription ${subscription._id}:`, err);
+          }
+        })
+      );
+      
+      setRejectedPaymentsMap(rejectedPayments);
+    } catch (err) {
+      console.error("Error fetching rejected payments:", err);
+    }
   };
 
   const fetchSubscriptionPayments = async (subscription: Subscription) => {
@@ -517,8 +569,15 @@ export default function SubscriptionsPage() {
                   </td>
                 </tr>
               ) : (
-                subscriptions.map((subscription) => (
-                  <tr key={subscription._id} className="hover:bg-gray-50">
+                subscriptions.map((subscription) => {
+                  const rejectedPayments = rejectedPaymentsMap[subscription._id] || [];
+                  const hasRejectedPayments = rejectedPayments.length > 0;
+                  const latestRejectedPayment = rejectedPayments.length > 0 
+                    ? rejectedPayments.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0]
+                    : null;
+                  
+                  return (
+                  <tr key={subscription._id} className={`hover:bg-gray-50 ${hasRejectedPayments ? 'bg-red-50' : ''}`}>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <a 
                         href={`/users?q=${encodeURIComponent(subscription.userId)}`}
@@ -527,6 +586,13 @@ export default function SubscriptionsPage() {
                       >
                         {subscription.userId}
                       </a>
+                      {hasRejectedPayments && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                            ⚠️ {rejectedPayments.length} rejected payment{rejectedPayments.length > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {subscription.planName}
@@ -565,6 +631,18 @@ export default function SubscriptionsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {subscription.totalPaid.toFixed(2)} {subscription.currency}
+                      {hasRejectedPayments && latestRejectedPayment && (
+                        <div className="mt-1 text-xs text-red-600">
+                          <div className="font-semibold">⚠️ გადასახდელი: {latestRejectedPayment.amount} {latestRejectedPayment.currency}</div>
+                          {latestRejectedPayment.codeDescription && (
+                            <div className="text-red-500 mt-0.5" title={latestRejectedPayment.metadata?.bogCallbackData?.reject_reason || latestRejectedPayment.codeDescription}>
+                              მიზეზი: {latestRejectedPayment.codeDescription.length > 50 
+                                ? latestRejectedPayment.codeDescription.substring(0, 50) + '...' 
+                                : latestRejectedPayment.codeDescription}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex gap-2">
@@ -614,7 +692,8 @@ export default function SubscriptionsPage() {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -733,17 +812,34 @@ export default function SubscriptionsPage() {
                             {formatTime(payment.paymentDate)}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
-                            <span
-                              className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                payment.status === 'completed' || payment.status === 'success'
-                                  ? 'bg-green-100 text-green-800'
-                                  : payment.status === 'pending'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
-                            >
-                              {payment.status}
-                            </span>
+                            <div className="flex flex-col gap-1">
+                              <span
+                                className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  payment.status === 'completed' || payment.status === 'success'
+                                    ? 'bg-green-100 text-green-800'
+                                    : payment.status === 'pending'
+                                    ? 'bg-yellow-100 text-yellow-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}
+                              >
+                                {payment.status}
+                              </span>
+                              {payment.status === 'rejected' && (
+                                <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-xs">
+                                  <div className="font-semibold text-red-800">⚠️ გადახდა უარყოფილია</div>
+                                  {payment.codeDescription && (
+                                    <div className="text-red-700 mt-1">
+                                      <span className="font-medium">მიზეზი:</span> {payment.codeDescription}
+                                    </div>
+                                  )}
+                                  {payment.metadata?.bogCallbackData?.reject_reason && (
+                                    <div className="text-red-600 mt-1 text-xs">
+                                      <span className="font-medium">BOG:</span> {payment.metadata.bogCallbackData.reject_reason}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                             {payment.cardType ? (

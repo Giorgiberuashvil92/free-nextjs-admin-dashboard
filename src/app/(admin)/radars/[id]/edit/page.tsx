@@ -48,7 +48,7 @@ export default function EditRadarPage() {
       try {
         setLoadingRadar(true);
         const res = await apiGetJson<{ success: boolean; data: Radar } | Radar>(`/radars/${radarId}`);
-        const radar = 'success' in res && res.success ? res.data : res;
+        const radar: Radar = 'success' in res && res.success ? (res as { success: boolean; data: Radar }).data : res as Radar;
         
         setForm({
           latitude: radar.latitude?.toString() || "",
