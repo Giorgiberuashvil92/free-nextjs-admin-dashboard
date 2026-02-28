@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Get backend URL based on environment
-// Always use production backend URL
 const getBackendUrl = (request: NextRequest): string => {
   // Environment variable override (highest priority)
   if (process.env.NEXT_PUBLIC_BACKEND_URL) {
     return process.env.NEXT_PUBLIC_BACKEND_URL;
   }
   
-  // Always use production backend
+  // Development: try localhost backend first, fallback to production
+  if (process.env.NODE_ENV === 'development') {
+    const localhostBackend = process.env.LOCAL_BACKEND_URL || 'http://localhost:3000';
+    // In development, you can set LOCAL_BACKEND_URL to use local backend
+    if (process.env.LOCAL_BACKEND_URL) {
+      return localhostBackend;
+    }
+  }
+  
+  // Production: use production backend
   return 'https://marte-backend-production.up.railway.app';
 };
 
@@ -61,7 +69,11 @@ async function handleRequest(
     const path = params.path.join('/');
     const url = new URL(request.url);
     const searchParams = url.searchParams.toString();
-    const backendUrl = `${getBackendUrl(request)}/${path}${searchParams ? `?${searchParams}` : ''}`;
+    
+    // Get primary backend URL
+    let backendUrl = `${getBackendUrl(request)}/${path}${searchParams ? `?${searchParams}` : ''}`;
+    const primaryBackend = getBackendUrl(request);
+    const localhostBackend = process.env.LOCAL_BACKEND_URL || 'http://localhost:3000';
 
     console.log(`[PROXY] ${method} ${path} -> ${backendUrl}`);
 
@@ -87,10 +99,42 @@ async function handleRequest(
       }
     }
 
-    const response = await fetch(backendUrl, options);
-    const data = await response.text();
+    // Try primary backend first
+    let response = await fetch(backendUrl, options);
+    let data = await response.text();
     
-    console.log(`[PROXY] Response status: ${response.status}`);
+    console.log(`[PROXY] Primary response status: ${response.status}, NODE_ENV: ${process.env.NODE_ENV}, primaryBackend: ${primaryBackend}`);
+    
+    // If 404 in development and primary is production, try localhost
+    if (response.status === 404 && 
+        process.env.NODE_ENV === 'development' && 
+        primaryBackend.includes('railway.app') &&
+        !primaryBackend.includes('localhost')) {
+      console.log(`[PROXY] 404 from production, trying localhost: ${localhostBackend}`);
+      const localhostUrl = `${localhostBackend}/${path}${searchParams ? `?${searchParams}` : ''}`;
+      console.log(`[PROXY] Localhost URL: ${localhostUrl}`);
+      try {
+        const localhostResponse = await fetch(localhostUrl, options);
+        const localhostData = await localhostResponse.text();
+        console.log(`[PROXY] Localhost response status: ${localhostResponse.status}`);
+        
+        if (localhostResponse.ok || localhostResponse.status !== 404) {
+          console.log(`[PROXY] Using localhost response`);
+          response = localhostResponse;
+          data = localhostData;
+          backendUrl = localhostUrl;
+        } else {
+          console.log(`[PROXY] Localhost also returned ${localhostResponse.status}, keeping original response`);
+        }
+      } catch (localhostError) {
+        console.log(`[PROXY] Localhost request failed:`, localhostError);
+        // Fall back to original response
+      }
+    } else {
+      console.log(`[PROXY] Not trying localhost: status=${response.status}, NODE_ENV=${process.env.NODE_ENV}, isRailway=${primaryBackend.includes('railway.app')}`);
+    }
+    
+    console.log(`[PROXY] Final response status: ${response.status} from ${backendUrl}`);
     
     let jsonData;
     try {

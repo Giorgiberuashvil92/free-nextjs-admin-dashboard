@@ -10,7 +10,7 @@ async function handle<T>(res: Response): Promise<T> {
     throw new Error(`HTTP ${res.status} ${res.statusText} ${text}`);
   }
   const json = (await res.json().catch(() => ({}))) as unknown;
-  const unwrapped = (json as any)?.data ?? json; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const unwrapped = (json as any)?.data ?? json;
   return unwrapped as T;
 }
 

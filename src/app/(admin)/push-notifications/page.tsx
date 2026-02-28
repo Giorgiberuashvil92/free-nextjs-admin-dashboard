@@ -6,6 +6,107 @@ import { apiGetJson } from '@/lib/api';
 
 type SendToType = 'all' | 'role' | 'active' | 'userIds';
 
+type NotificationType = 
+  | 'general'
+  | 'review'
+  | 'carfax'
+  | 'subscription_activated'
+  | 'garage_reminder'
+  | 'chat_message'
+  | 'carwash_booking'
+  | 'new_request'
+  | 'new_offer'
+  | 'ai_recommendation'
+  | 'offer_status';
+
+interface NotificationTypeConfig {
+  type: NotificationType;
+  label: string;
+  screen: string;
+  icon: string;
+  description: string;
+}
+
+const NOTIFICATION_TYPES: NotificationTypeConfig[] = [
+  {
+    type: 'general',
+    label: 'General',
+    screen: 'Notifications',
+    icon: '📢',
+    description: 'ზოგადი შეტყობინება',
+  },
+  {
+    type: 'review',
+    label: 'Review Us',
+    screen: 'Review',
+    icon: '⭐',
+    description: 'გადავა Review სქრინზე',
+  },
+  {
+    type: 'carfax',
+    label: 'Carfax',
+    screen: 'Carfax',
+    icon: '🚗',
+    description: 'გადავა Carfax სქრინზე',
+  },
+  {
+    type: 'subscription_activated',
+    label: 'Subscription Activated',
+    screen: 'Premium',
+    icon: '💎',
+    description: 'გადავა Home-ზე Premium Modal-ით',
+  },
+  {
+    type: 'garage_reminder',
+    label: 'Garage Reminder',
+    screen: 'Garage',
+    icon: '⏰',
+    description: 'გადავა Garage სქრინზე',
+  },
+  {
+    type: 'chat_message',
+    label: 'Chat Message',
+    screen: 'Chat',
+    icon: '💬',
+    description: 'გადავა Chat სქრინზე',
+  },
+  {
+    type: 'carwash_booking',
+    label: 'Carwash Booking',
+    screen: 'Bookings',
+    icon: '🚿',
+    description: 'გადავა Bookings სქრინზე',
+  },
+  {
+    type: 'new_request',
+    label: 'New Request',
+    screen: 'RequestDetails',
+    icon: '🆕',
+    description: 'გადავა Offers/Request სქრინზე',
+  },
+  {
+    type: 'new_offer',
+    label: 'New Offer',
+    screen: 'OfferDetails',
+    icon: '💰',
+    description: 'გადავა Offers სქრინზე',
+  },
+  {
+    type: 'ai_recommendation',
+    label: 'AI Recommendation',
+    screen: 'AIRecommendations',
+    icon: '🤖',
+    description: 'გადავა All Requests სქრინზე',
+  },
+  {
+    type: 'offer_status',
+    label: 'Offer Status',
+    screen: 'OfferDetails',
+    icon: '📊',
+    description: 'გადავა Offers სქრინზე',
+  },
+];
+
 interface UserStats {
   total: number;
   active: number;
@@ -27,8 +128,8 @@ interface User {
 export default function PushNotificationsPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [dataType, setDataType] = useState('general');
-  const [sendToType, setSendToType] = useState<SendToType>('all');
+  const [notificationType, setNotificationType] = useState<NotificationType>('general');
+  const [sendToType, setSendToType] = useState<SendToType>('active');
   const [role, setRole] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
   const [sending, setSending] = useState(false);
@@ -153,9 +254,7 @@ export default function PushNotificationsPage() {
   const getTargetCount = (): number => {
     if (!userStats) return 0;
     
-    if (sendToType === 'all') {
-      return userStats.total;
-    } else if (sendToType === 'active') {
+    if (sendToType === 'active') {
       return userStats.active;
     } else if (sendToType === 'role' && role) {
       const roleCount = userStats.byRole[role] || 0;
@@ -186,9 +285,7 @@ export default function PushNotificationsPage() {
     const targetCount = getTargetCount();
     let confirmMessage = `ნამდვილად გსურთ გაგზავნა push notification?\n\nTitle: ${title}\nBody: ${body}\n\n`;
     
-    if (sendToType === 'all') {
-      confirmMessage += `მიმღები: ყველა user (${targetCount} მომხმარებელი)`;
-    } else if (sendToType === 'role') {
+    if (sendToType === 'role') {
       confirmMessage += `მიმღები: Role "${role}"${activeOnly ? ' (მხოლოდ active)' : ''} (${targetCount} მომხმარებელი)`;
     } else if (sendToType === 'active') {
       confirmMessage += `მიმღები: მხოლოდ active user-ები (${targetCount} მომხმარებელი)`;
@@ -207,11 +304,15 @@ export default function PushNotificationsPage() {
     setLastResult(null);
 
     try {
+      // Get notification type config
+      const typeConfig = NOTIFICATION_TYPES.find(t => t.type === notificationType) || NOTIFICATION_TYPES[0];
+      
       const requestBody: any = {
         title: title.trim(),
         body: body.trim(),
         data: {
-          type: dataType,
+          type: typeConfig.type,
+          screen: typeConfig.screen,
           timestamp: new Date().toISOString(),
         },
       };
@@ -247,10 +348,9 @@ export default function PushNotificationsPage() {
       
       alert(`✅ წარმატებით გაიგზავნა ${result.sent || result.total || 0} მოწყობილობაზე!`);
       
-      // გავასუფთავოთ ფორმა
       setTitle('');
       setBody('');
-      setDataType('general');
+      setNotificationType('general');
       setSendToType('all');
       setRole('');
       setActiveOnly(false);
@@ -362,21 +462,38 @@ export default function PushNotificationsPage() {
 
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-                <span className="text-lg">🏷️</span>
-                <span>Data Type</span>
+                <span className="text-lg">🎯</span>
+                <span>Notification Type (სქრინი)</span>
               </label>
               <select
-                value={dataType}
-                onChange={(e) => setDataType(e.target.value)}
+                value={notificationType}
+                onChange={(e) => setNotificationType(e.target.value as NotificationType)}
                 className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 disabled={sending}
               >
-                <option value="general">General</option>
-                <option value="promotion">Promotion</option>
-                <option value="update">Update</option>
-                <option value="welcome">Welcome</option>
-                <option value="reminder">Reminder</option>
+                {NOTIFICATION_TYPES.map((type) => (
+                  <option key={type.type} value={type.type}>
+                    {type.icon} {type.label} - {type.description}
+                  </option>
+                ))}
               </select>
+              {notificationType !== 'general' && (
+                <div className="mt-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-600 dark:text-blue-400">ℹ️</span>
+                    <div className="text-xs text-blue-800 dark:text-blue-300">
+                      <div className="font-semibold mb-1">
+                        {NOTIFICATION_TYPES.find(t => t.type === notificationType)?.label}
+                      </div>
+                      <div>
+                        გადავა: <span className="font-mono font-semibold">
+                          /{NOTIFICATION_TYPES.find(t => t.type === notificationType)?.screen.toLowerCase() || 'notifications'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -407,7 +524,7 @@ export default function PushNotificationsPage() {
 
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-              <span className="text-lg">🎯</span>
+              <span className="text-lg">👥</span>
               <span>გაგზავნა ვისთვის *</span>
               {userStats && (
                 <span className="text-xs font-normal text-blue-600 dark:text-blue-400 ml-auto">
@@ -428,7 +545,6 @@ export default function PushNotificationsPage() {
               className="w-full px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               disabled={sending}
             >
-              <option value="all">ყველა User-ს ({userStats?.total || 0})</option>
               <option value="active">მხოლოდ Active User-ებს ({userStats?.active || 0})</option>
               <option value="role">კონკრეტული Role-ის მქონე User-ებს</option>
               <option value="userIds">კონკრეტული User-ები (არჩევით)</option>
@@ -507,24 +623,6 @@ export default function PushNotificationsPage() {
                   {userStats && (
                     <div className="text-xs text-green-600 dark:text-green-400 mt-1">
                       სულ {userStats.active} აქტიური მომხმარებელი
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {sendToType === 'all' && (
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🌍</span>
-                <div>
-                  <div className="text-sm font-semibold text-blue-800 dark:text-blue-200">
-                    გაიგზავნება ყველა user-ს
-                  </div>
-                  {userStats && (
-                    <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                      სულ {userStats.total} მომხმარებელი
                     </div>
                   )}
                 </div>
@@ -697,9 +795,7 @@ export default function PushNotificationsPage() {
                 <span>📢</span>
                 <span>
                   გაგზავნა{' '}
-                  {sendToType === 'all'
-                    ? 'ყველა User-ს'
-                    : sendToType === 'active'
+                  {sendToType === 'active'
                     ? 'Active User-ებს'
                     : sendToType === 'role'
                     ? `${role} Role-ის User-ებს`
