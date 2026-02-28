@@ -711,17 +711,30 @@ export default function UsersPage() {
                         Object.values(userSubscriptions).find((sub: any) => sub?.userId === u.id);
                       
                       if (subscription) {
+                        // შევამოწმოთ status - თუ არის 'pending' unpaid rejected payment-ის გამო, არ ჩანდეს premium
+                        const isActive = subscription.status === 'active';
+                        const isPremium = (subscription.planId === 'premium' || subscription.planName?.toLowerCase().includes('premium')) && isActive;
+                        const isBasic = (subscription.planId === 'basic' || subscription.planName?.toLowerCase().includes('basic')) && isActive;
+                        const hasUnpaidRejected = subscription._hasUnpaidRejectedPayment || subscription.status === 'pending';
+                        
                         return (
                           <div className="flex flex-col gap-1">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              subscription.planId === 'premium' || subscription.planName?.toLowerCase().includes('premium')
+                              isPremium
                                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                : subscription.planId === 'basic' || subscription.planName?.toLowerCase().includes('basic')
+                                : isBasic
                                 ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
                                 : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400'
                             }`}>
-                              {subscription.planName || subscription.planId || 'N/A'}
+                              {hasUnpaidRejected && (subscription.planId === 'premium' || subscription.planName?.toLowerCase().includes('premium'))
+                                ? 'Free (გადაუხდელი)'
+                                : subscription.planName || subscription.planId || 'N/A'}
                             </span>
+                            {hasUnpaidRejected && (
+                              <span className="text-xs text-red-600 dark:text-red-400" title="გადაუხდელი rejected payment">
+                                ⚠️ გადაუხდელი
+                              </span>
+                            )}
                             {subscription.userId && subscription.userId !== u.id && (
                               <span className="text-xs text-red-600 dark:text-red-400" title={`Subscription userId: ${subscription.userId}, User id: ${u.id}`}>
                                 ⚠️ ID mismatch
