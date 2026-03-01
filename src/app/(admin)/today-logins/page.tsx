@@ -67,10 +67,20 @@ interface UniqueUser {
   loginCount: number;
 }
 
+interface DayStats {
+  date: Date;
+  dateString: string;
+  logins: number;
+  uniqueUsers: number;
+  successfulLogins: number;
+  failedLogins: number;
+}
+
 export default function TodayLoginsPage() {
-  const [activeTab, setActiveTab] = useState<'today' | 'yesterday'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'yesterday' | 'week'>('today');
   const [todayLogins, setTodayLogins] = useState<LoginHistory[]>([]);
   const [yesterdayLogins, setYesterdayLogins] = useState<LoginHistory[]>([]);
+  const [weekLogins, setWeekLogins] = useState<LoginHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [todayStats, setTodayStats] = useState<{ logins: number; uniqueUsers: number; successfulLogins: number; failedLogins: number }>({
     logins: 0,
@@ -84,6 +94,7 @@ export default function TodayLoginsPage() {
     successfulLogins: 0,
     failedLogins: 0
   });
+  const [weekStats, setWeekStats] = useState<DayStats[]>([]);
   const [todayUniqueUsers, setTodayUniqueUsers] = useState<UniqueUser[]>([]);
   const [yesterdayUniqueUsers, setYesterdayUniqueUsers] = useState<UniqueUser[]>([]);
   const [showUniqueUsersModal, setShowUniqueUsersModal] = useState(false);
@@ -96,6 +107,27 @@ export default function TodayLoginsPage() {
     status: '' as 'success' | 'failed' | '',
   });
 
+  const getGeorgiaWeekStart = (): Date => {
+    const today = getGeorgiaTodayStart();
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - 6); // ბოლო 7 დღე (დღეს ჩათვლით)
+    return weekStart;
+  };
+
+  const getDayStart = (date: Date): Date => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+    return new Date(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}T00:00:00+04:00`);
+  };
+
+  const isDateInDay = (date: Date, targetDate: Date): boolean => {
+    const dayStart = getDayStart(targetDate);
+    const nextDayStart = new Date(dayStart);
+    nextDayStart.setDate(nextDayStart.getDate() + 1);
+    return date >= dayStart && date < nextDayStart;
+  };
+
   const loadLogins = useCallback(async () => {
     try {
       setLoading(true);
@@ -103,11 +135,11 @@ export default function TodayLoginsPage() {
       if (filters.userId) params.append('userId', filters.userId);
       if (filters.phone) params.append('phone', filters.phone);
       if (filters.status) params.append('status', filters.status);
-      params.append('limit', '5000');
+      params.append('limit', '10000'); // გავზარდოთ limit 1 კვირისთვის
       
-      // ბოლო 2 დღის მონაცემებისთვის
-      const yesterdayStart = getGeorgiaYesterdayStart();
-      params.append('startDate', yesterdayStart.toISOString());
+      // ბოლო 7 დღის მონაცემებისთვის
+      const weekStart = getGeorgiaWeekStart();
+      params.append('startDate', weekStart.toISOString());
 
       const response = await apiGetJson<{
         success: boolean;
@@ -206,18 +238,64 @@ export default function TodayLoginsPage() {
           successfulLogins: yesterdaySuccessfulLogins,
           failedLogins: yesterdayFailedLogins
         });
+
+        // 1 კვირის სტატისტიკა
+        const weekStart = getGeorgiaWeekStart();
+        const weekData = response.data.filter((item) => {
+          const loginDate = new Date(item.loginAt);
+          return loginDate >= weekStart;
+        });
+        setWeekLogins(weekData);
+
+        // ყოველდღე სტატისტიკა
+        const dailyStats: DayStats[] = [];
+        for (let i = 6; i >= 0; i--) {
+          const date = new Date(getGeorgiaTodayStart());
+          date.setDate(date.getDate() - i);
+          const dayStart = getDayStart(date);
+          const nextDayStart = new Date(dayStart);
+          nextDayStart.setDate(nextDayStart.getDate() + 1);
+
+          const dayData = weekData.filter((item) => {
+            const loginDate = new Date(item.loginAt);
+            return loginDate >= dayStart && loginDate < nextDayStart;
+          });
+
+          const uniqueUsersSet = new Set(dayData.map(item => item.userId));
+          const successfulLogins = dayData.filter(item => item.status === 'success').length;
+          const failedLogins = dayData.filter(item => item.status === 'failed').length;
+
+          dailyStats.push({
+            date: date,
+            dateString: date.toLocaleDateString('ka-GE', { 
+              timeZone: 'Asia/Tbilisi',
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric'
+            }),
+            logins: dayData.length,
+            uniqueUsers: uniqueUsersSet.size,
+            successfulLogins: successfulLogins,
+            failedLogins: failedLogins
+          });
+        }
+        setWeekStats(dailyStats);
       } else {
         setTodayLogins([]);
         setYesterdayLogins([]);
+        setWeekLogins([]);
+        setWeekStats([]);
       }
-    } catch (error) {
-      console.error('Error loading logins:', error);
-      setTodayLogins([]);
-      setYesterdayLogins([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
+      } catch (error) {
+        console.error('Error loading logins:', error);
+        setTodayLogins([]);
+        setYesterdayLogins([]);
+        setWeekLogins([]);
+        setWeekStats([]);
+      } finally {
+        setLoading(false);
+      }
+    }, [filters]);
 
   useEffect(() => {
     loadLogins();
@@ -277,12 +355,14 @@ export default function TodayLoginsPage() {
           </div>
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-4 py-2">
             <div className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-              📅 {activeTab === 'today' ? 'დღეს' : 'გუშინ'}
+              📅 {activeTab === 'today' ? 'დღეს' : activeTab === 'yesterday' ? 'გუშინ' : '1 კვირა'}
             </div>
             <div className="text-xs text-blue-600 dark:text-blue-400">
               {activeTab === 'today' 
                 ? new Date().toLocaleDateString('ka-GE', { timeZone: 'Asia/Tbilisi' })
-                : getGeorgiaYesterdayStart().toLocaleDateString('ka-GE', { timeZone: 'Asia/Tbilisi' })
+                : activeTab === 'yesterday'
+                ? getGeorgiaYesterdayStart().toLocaleDateString('ka-GE', { timeZone: 'Asia/Tbilisi' })
+                : `${getGeorgiaWeekStart().toLocaleDateString('ka-GE', { timeZone: 'Asia/Tbilisi' })} - ${new Date().toLocaleDateString('ka-GE', { timeZone: 'Asia/Tbilisi' })}`
               }
             </div>
           </div>
@@ -313,39 +393,141 @@ export default function TodayLoginsPage() {
             >
               📅 გუშინდელი ({yesterdayStats.logins})
             </button>
+            <button
+              onClick={() => setActiveTab('week')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'week'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              📅 1 კვირა ({weekStats.reduce((sum, day) => sum + day.uniqueUsers, 0)})
+            </button>
           </nav>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">სულ შესვლა</div>
-          <button
-            onClick={handleAllLoginsClick}
-            className="text-2xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
-          >
-            {currentStats.logins}
-          </button>
+      {activeTab !== 'week' ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">სულ შესვლა</div>
+            <button
+              onClick={handleAllLoginsClick}
+              className="text-2xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
+            >
+              {currentStats.logins}
+            </button>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">უნიკალური იუზერები</div>
+            <button
+              onClick={handleUniqueUsersClick}
+              className="text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer transition-colors"
+            >
+              {currentStats.uniqueUsers}
+            </button>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">წარმატებული</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{currentStats.successfulLogins}</div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">წარუმატებელი</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{currentStats.failedLogins}</div>
+          </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">უნიკალური იუზერები</div>
-          <button
-            onClick={handleUniqueUsersClick}
-            className="text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer transition-colors"
-          >
-            {currentStats.uniqueUsers}
-          </button>
+      ) : (
+        <div className="mb-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              📅 ბოლო 7 დღის სტატისტიკა
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      დღე
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      უნიკალური იუზერები
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      სულ შესვლა
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      წარმატებული
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      წარუმატებელი
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {weekStats.map((day, index) => {
+                    const isToday = index === weekStats.length - 1;
+                    const isYesterday = index === weekStats.length - 2;
+                    return (
+                      <tr 
+                        key={day.dateString} 
+                        className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                          isToday ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                          {day.dateString}
+                          {isToday && <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(დღეს)</span>}
+                          {isYesterday && <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(გუშინ)</span>}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                            {day.uniqueUsers}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                          {day.logins}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          <span className="text-green-600 dark:text-green-400 font-semibold">
+                            {day.successfulLogins}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm">
+                          <span className="text-red-600 dark:text-red-400 font-semibold">
+                            {day.failedLogins}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {weekStats.length > 0 && (
+                    <tr className="bg-gray-100 dark:bg-gray-700 font-semibold">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                        სულ
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm">
+                        <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {weekStats.reduce((sum, day) => sum + day.uniqueUsers, 0)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">
+                        {weekStats.reduce((sum, day) => sum + day.logins, 0)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-green-600 dark:text-green-400">
+                        {weekStats.reduce((sum, day) => sum + day.successfulLogins, 0)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-red-600 dark:text-red-400">
+                        {weekStats.reduce((sum, day) => sum + day.failedLogins, 0)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">წარმატებული</div>
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{currentStats.successfulLogins}</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-          <div className="text-sm text-gray-600 dark:text-gray-400">წარუმატებელი</div>
-          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{currentStats.failedLogins}</div>
-        </div>
-      </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
@@ -397,14 +579,15 @@ export default function TodayLoginsPage() {
       </div>
 
       {/* Table - უნიკალური იუზერები */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">იტვირთება...</div>
-        ) : currentUniqueUsers.length === 0 ? (
-          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-            {activeTab === 'today' ? 'დღევანდელი' : 'გუშინდელი'} უნიკალური იუზერები ვერ მოიძებნა
-          </div>
-        ) : (
+      {activeTab !== 'week' && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          {loading ? (
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">იტვირთება...</div>
+          ) : currentUniqueUsers.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+              {activeTab === 'today' ? 'დღევანდელი' : 'გუშინდელი'} უნიკალური იუზერები ვერ მოიძებნა
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900">
@@ -482,7 +665,8 @@ export default function TodayLoginsPage() {
             </table>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Unique Users Modal */}
       {showUniqueUsersModal && (
