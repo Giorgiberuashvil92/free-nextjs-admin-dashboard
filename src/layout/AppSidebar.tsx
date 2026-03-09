@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState,useCallback } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -43,6 +43,16 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "კატეგორიებზე დაჭერები",
+    path: "/category-clicks",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "დაშლილების მოვლენები",
+    path: "/dismantler-events",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "ყველაზე აქტიური იუზერები",
     path: "/active-users",
   },
@@ -60,6 +70,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "სტორიები",
     path: "/stories",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "სიახლეები",
+    path: "/news-feed",
   },
   {
     icon: <PieChartIcon />,
@@ -105,6 +120,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "იუზერების მანქანები",
     path: "/garage-cars",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "საპატრულო ჯარიმები - აქტიური მანქანები",
+    path: "/fines-vehicles",
   },
   {
     icon: <PieChartIcon />,
@@ -235,7 +255,7 @@ const AppSidebar: React.FC = () => {
             <button
               onClick={() => handleSubmenuToggle(index, menuType)}
               className={`menu-item group  ${
-                openSubmenu?.type === menuType && openSubmenu?.index === index
+                effectiveOpenSubmenu?.type === menuType && effectiveOpenSubmenu?.index === index
                   ? "menu-item-active"
                   : "menu-item-inactive"
               } cursor-pointer ${
@@ -246,7 +266,7 @@ const AppSidebar: React.FC = () => {
             >
               <span
                 className={` ${
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
+                  effectiveOpenSubmenu?.type === menuType && effectiveOpenSubmenu?.index === index
                     ? "menu-item-icon-active"
                     : "menu-item-icon-inactive"
                 }`}
@@ -259,8 +279,8 @@ const AppSidebar: React.FC = () => {
               {(isExpanded || isHovered || isMobileOpen) && (
                 <ChevronDownIcon
                   className={`ml-auto w-5 h-5 transition-transform duration-200  ${
-                    openSubmenu?.type === menuType &&
-                    openSubmenu?.index === index
+                    effectiveOpenSubmenu?.type === menuType &&
+                    effectiveOpenSubmenu?.index === index
                       ? "rotate-180 text-brand-500"
                       : ""
                   }`}
@@ -298,7 +318,7 @@ const AppSidebar: React.FC = () => {
               className="overflow-hidden transition-all duration-300"
               style={{
                 height:
-                  openSubmenu?.type === menuType && openSubmenu?.index === index
+                  effectiveOpenSubmenu?.type === menuType && effectiveOpenSubmenu?.index === index
                     ? `${subMenuHeight[`${menuType}-${index}`]}px`
                     : "0px",
               }}
@@ -360,38 +380,30 @@ const AppSidebar: React.FC = () => {
   const subMenuRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // const isActive = (path: string) => path === pathname;
-   const isActive = useCallback((path: string) => path === pathname, [pathname]);
+  const isActive = (path: string) => path === pathname;
 
-  useEffect(() => {
-    // Check if the current path matches any submenu item
-    let submenuMatched = false;
-    ["main", "others"].forEach((menuType) => {
+  const matchedSubmenu = (() => {
+    let found: { type: "main" | "others"; index: number } | null = null;
+    (["main", "others"] as const).forEach((menuType) => {
       const items = menuType === "main" ? navItems : othersItems;
       items.forEach((nav, index) => {
-        if (nav.subItems) {
-          nav.subItems.forEach((subItem) => {
-            if (isActive(subItem.path)) {
-              setOpenSubmenu({
-                type: menuType as "main" | "others",
-                index,
-              });
-              submenuMatched = true;
-            }
-          });
-        }
+        if (!nav.subItems) return;
+        nav.subItems.forEach((subItem) => {
+          if (isActive(subItem.path)) {
+            found = { type: menuType, index };
+          }
+        });
       });
     });
+    return found;
+  })();
 
-    // If no submenu item matches, close the open submenu
-    if (!submenuMatched) {
-      setOpenSubmenu(null);
-    }
-  }, [pathname,isActive]);
+  const effectiveOpenSubmenu = openSubmenu ?? matchedSubmenu;
 
   useEffect(() => {
     // Set the height of the submenu items when the submenu is opened
-    if (openSubmenu !== null) {
-      const key = `${openSubmenu.type}-${openSubmenu.index}`;
+    if (effectiveOpenSubmenu !== null) {
+      const key = `${effectiveOpenSubmenu.type}-${effectiveOpenSubmenu.index}`;
       if (subMenuRefs.current[key]) {
         setSubMenuHeight((prevHeights) => ({
           ...prevHeights,
@@ -399,7 +411,7 @@ const AppSidebar: React.FC = () => {
         }));
       }
     }
-  }, [openSubmenu]);
+  }, [effectiveOpenSubmenu]);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
     setOpenSubmenu((prevOpenSubmenu) => {

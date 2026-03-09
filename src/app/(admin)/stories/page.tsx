@@ -148,7 +148,7 @@ export default function AdminStoriesPage() {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">სთორები</h1>
+        <h1 className="text-xl font-bold text-black">სთორები</h1>
         <p className="text-sm text-gray-500">სთორების მართვა და ნახვების სტატისტიკა</p>
       </div>
 

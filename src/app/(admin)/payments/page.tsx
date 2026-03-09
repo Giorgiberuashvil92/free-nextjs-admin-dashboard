@@ -1131,13 +1131,13 @@ export default function PaymentsPage() {
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1">
-                          <span
-                            className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(
-                              payment.status
-                            )}`}
-                          >
-                            {payment.status}
-                          </span>
+                        <span
+                          className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadge(
+                            payment.status
+                          )}`}
+                        >
+                          {payment.status}
+                        </span>
                           {isRejectedPayment && (
                             <span className="text-xs text-orange-600 font-medium">
                               ⚠️ ფული არ ჩამოეჭრა

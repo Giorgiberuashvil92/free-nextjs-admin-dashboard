@@ -286,16 +286,16 @@ export default function TodayLoginsPage() {
         setWeekLogins([]);
         setWeekStats([]);
       }
-      } catch (error) {
-        console.error('Error loading logins:', error);
-        setTodayLogins([]);
-        setYesterdayLogins([]);
+    } catch (error) {
+      console.error('Error loading logins:', error);
+      setTodayLogins([]);
+      setYesterdayLogins([]);
         setWeekLogins([]);
         setWeekStats([]);
-      } finally {
-        setLoading(false);
-      }
-    }, [filters]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
 
   useEffect(() => {
     loadLogins();
@@ -409,34 +409,34 @@ export default function TodayLoginsPage() {
 
       {/* Stats Cards */}
       {activeTab !== 'week' ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">სულ შესვლა</div>
-            <button
-              onClick={handleAllLoginsClick}
-              className="text-2xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
-            >
-              {currentStats.logins}
-            </button>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">უნიკალური იუზერები</div>
-            <button
-              onClick={handleUniqueUsersClick}
-              className="text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer transition-colors"
-            >
-              {currentStats.uniqueUsers}
-            </button>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">წარმატებული</div>
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{currentStats.successfulLogins}</div>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-            <div className="text-sm text-gray-600 dark:text-gray-400">წარუმატებელი</div>
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{currentStats.failedLogins}</div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">სულ შესვლა</div>
+          <button
+            onClick={handleAllLoginsClick}
+            className="text-2xl font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer transition-colors"
+          >
+            {currentStats.logins}
+          </button>
         </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">უნიკალური იუზერები</div>
+          <button
+            onClick={handleUniqueUsersClick}
+            className="text-2xl font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 cursor-pointer transition-colors"
+          >
+            {currentStats.uniqueUsers}
+          </button>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">წარმატებული</div>
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{currentStats.successfulLogins}</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">წარუმატებელი</div>
+          <div className="text-2xl font-bold text-red-600 dark:text-red-400">{currentStats.failedLogins}</div>
+        </div>
+      </div>
       ) : (
         <div className="mb-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
@@ -580,14 +580,14 @@ export default function TodayLoginsPage() {
 
       {/* Table - უნიკალური იუზერები */}
       {activeTab !== 'week' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-          {loading ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">იტვირთება...</div>
-          ) : currentUniqueUsers.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              {activeTab === 'today' ? 'დღევანდელი' : 'გუშინდელი'} უნიკალური იუზერები ვერ მოიძებნა
-            </div>
-          ) : (
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">იტვირთება...</div>
+        ) : currentUniqueUsers.length === 0 ? (
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            {activeTab === 'today' ? 'დღევანდელი' : 'გუშინდელი'} უნიკალური იუზერები ვერ მოიძებნა
+          </div>
+        ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-900">
@@ -665,7 +665,7 @@ export default function TodayLoginsPage() {
             </table>
           </div>
         )}
-        </div>
+      </div>
       )}
 
       {/* Unique Users Modal */}
