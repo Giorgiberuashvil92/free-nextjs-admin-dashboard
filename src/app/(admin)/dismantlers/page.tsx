@@ -41,10 +41,14 @@ type EngagementData = {
 };
 
 const LOCATIONS = ["თბილისი", "ბათუმი", "ქუთაისი", "რუსთავი", "გორი", "ზუგდიდი", "ფოთი", "ახალქალაქი", "ოზურგეთი", "ტყიბული", "სხვა"];
+const PAGE_SIZE = 20;
 
 export default function DismantlersAdminPage() {
   const [dismantlers, setDismantlers] = useState<Dismantler[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Dismantler | null>(null);
@@ -92,17 +96,19 @@ export default function DismantlersAdminPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    setPage(1);
+    setHasMore(true);
     try {
-      const res = await apiGetJson<{ success: boolean; data: Dismantler[] } | Dismantler[]>(`/dismantlers`);
-      const data = Array.isArray(res) ? res : res.data;
+      const res = await apiGetJson<{ success: boolean; data: Dismantler[] } | Dismantler[]>(
+        `/dismantlers?page=1&limit=${PAGE_SIZE}`
+      );
+      const data = Array.isArray(res) ? res : (res as { data?: Dismantler[] }).data;
       const dismantlersList = (data || []).map((d) => ({ ...d, id: d.id || (d as any)._id }));
       setDismantlers(dismantlersList);
-      
-      // ავტომატურად ვიტვირთავთ სტატისტიკას ყველა დაშლილისთვის
+      setHasMore(dismantlersList.length >= PAGE_SIZE);
+
       dismantlersList.forEach((d) => {
-        if (d.id) {
-          loadStats(d.id);
-        }
+        if (d.id) loadStats(d.id);
       });
     } catch (e: unknown) {
       const message = e && typeof e === "object" && "message" in e ? String((e as { message?: unknown }).message) : "Request failed";
@@ -112,6 +118,31 @@ export default function DismantlersAdminPage() {
       setLoading(false);
     }
   }, [loadStats]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    setError("");
+    const nextPage = page + 1;
+    try {
+      const res = await apiGetJson<{ success: boolean; data: Dismantler[] } | Dismantler[]>(
+        `/dismantlers?page=${nextPage}&limit=${PAGE_SIZE}`
+      );
+      const data = Array.isArray(res) ? res : (res as { data?: Dismantler[] }).data;
+      const nextList = (data || []).map((d) => ({ ...d, id: d.id || (d as any)._id }));
+      setDismantlers((prev) => [...prev, ...nextList]);
+      setPage(nextPage);
+      setHasMore(nextList.length >= PAGE_SIZE);
+      nextList.forEach((d) => {
+        if (d.id) loadStats(d.id);
+      });
+    } catch (e: unknown) {
+      const message = e && typeof e === "object" && "message" in e ? String((e as { message?: unknown }).message) : "Request failed";
+      setError(message);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadStats, loadingMore, hasMore, page]);
 
   useEffect(() => {
     load();
@@ -598,6 +629,19 @@ export default function DismantlersAdminPage() {
           })
         )}
       </div>
+
+      {!loading && dismantlers.length > 0 && hasMore && (
+        <div className="flex justify-center pt-4 pb-8">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="px-6 py-3 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-lg font-medium text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loadingMore ? "იტვირთება..." : "მეტის ჩატვირთვა"}
+          </button>
+        </div>
+      )}
 
       {/* Engagement Modal */}
       {showEngagementModal && (
