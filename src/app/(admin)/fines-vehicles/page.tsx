@@ -3,14 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { apiGet } from '@/lib/api';
 
-interface ActiveVehicle {
-  Id: string;
-  VehicleNumber: string;
-  TechPassportNumber: string;
-  AddDate: string;
-}
-
-interface RegisteredVehicle {
+interface RegisteredVehicleWithOwner {
   _id: string;
   userId: string;
   vehicleNumber: string;
@@ -21,16 +14,17 @@ interface RegisteredVehicle {
   mediaFile: boolean;
   createdAt: string;
   updatedAt: string;
-  user?: {
+  owner?: {
     id: string;
     phone: string;
     firstName?: string;
     lastName?: string;
-  };
+    email?: string;
+  } | null;
 }
 
 export default function FinesVehiclesPage() {
-  const [vehicles, setVehicles] = useState<ActiveVehicle[]>([]);
+  const [vehicles, setVehicles] = useState<RegisteredVehicleWithOwner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,12 +33,15 @@ export default function FinesVehiclesPage() {
     setLoading(true);
     setError('');
     try {
-      const data = await apiGet<ActiveVehicle[]>('/fines/vehicles/active');
+      const data = await apiGet<RegisteredVehicleWithOwner[]>(
+        '/fines/vehicles/registered-with-owners',
+      );
       setVehicles(Array.isArray(data) ? data : []);
-    } catch (e: any) {
-      console.error('Error loading active vehicles:', e);
+    } catch (e: unknown) {
+      console.error('Error loading registered vehicles:', e);
       setError(
-        e?.message || 'აქტიური მანქანების ჩატვირთვა ვერ მოხერხდა',
+        (e as Error)?.message ||
+          'დარეგისტრირებული მანქანების ჩატვირთვა ვერ მოხერხდა',
       );
     } finally {
       setLoading(false);
@@ -79,14 +76,16 @@ export default function FinesVehiclesPage() {
 
   const filteredVehicles = vehicles.filter((vehicle) => {
     const searchLower = searchTerm.toLowerCase();
+    const ownerName = [vehicle.owner?.firstName, vehicle.owner?.lastName]
+      .filter(Boolean)
+      .join(' ');
     return (
-      (vehicle.VehicleNumber || '')
-        .toLowerCase()
-        .includes(searchLower) ||
-      (vehicle.TechPassportNumber || '')
-        .toLowerCase()
-        .includes(searchLower) ||
-      (vehicle.Id || '').toLowerCase().includes(searchLower)
+      (vehicle.vehicleNumber || '').toLowerCase().includes(searchLower) ||
+      (vehicle.techPassportNumber || '').toLowerCase().includes(searchLower) ||
+      (vehicle.userId || '').toLowerCase().includes(searchLower) ||
+      (vehicle.owner?.phone || '').toLowerCase().includes(searchLower) ||
+      (ownerName || '').toLowerCase().includes(searchLower) ||
+      (vehicle.owner?.email || '').toLowerCase().includes(searchLower)
     );
   });
 
@@ -122,7 +121,7 @@ export default function FinesVehiclesPage() {
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold">
-            🚨 საპატრულო ჯარიმები - აქტიური მანქანები
+            🚨 საპატრულო ჯარიმები - დარეგისტრირებული მანქანები (ბაზა + მფლობელი)
           </h1>
           <span className="text-sm px-2 py-1 rounded-full bg-gray-100 text-gray-700">
             {loading
@@ -134,7 +133,7 @@ export default function FinesVehiclesPage() {
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ძიება: ნომერი, ტექ. პასპორტი..."
+            placeholder="ძიება: ნომერი, ტექ. პასპორტი, ტელეფონი, მფლობელი..."
             className="border rounded-md px-3 py-2 text-base w-96 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
@@ -149,7 +148,7 @@ export default function FinesVehiclesPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white border rounded-lg p-4">
-          <div className="text-sm text-gray-500">სულ აქტიური მანქანა</div>
+          <div className="text-sm text-gray-500">სულ დარეგისტრირებული (ბაზა)</div>
           <div className="text-2xl font-bold text-gray-900">
             {vehicles.length}
           </div>
@@ -174,13 +173,16 @@ export default function FinesVehiclesPage() {
           <thead className="bg-gray-50 border-b">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ID
+                SA ID
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 სახელმწიფო ნომერი
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                ტექ. პასპორტის ნომერი
+                ტექ. პასპორტი
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                მფლობელი (ტელეფონი / სახელი)
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 დამატების თარიღი
@@ -191,36 +193,61 @@ export default function FinesVehiclesPage() {
             {filteredVehicles.length === 0 ? (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   {searchTerm
                     ? 'ძიების შედეგი არ მოიძებნა'
-                    : 'აქტიური მანქანები არ არის'}
+                    : 'დარეგისტრირებული მანქანები არ არის'}
                 </td>
               </tr>
             ) : (
               filteredVehicles.map((vehicle) => (
                 <tr
-                  key={vehicle.Id}
+                  key={vehicle._id}
                   className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                    {vehicle.Id}
+                    {vehicle.saVehicleId}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-semibold text-gray-900">
-                      {vehicle.VehicleNumber}
+                      {vehicle.vehicleNumber}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-700">
-                      {vehicle.TechPassportNumber}
+                      {vehicle.techPassportNumber}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-700">
-                      {formatDate(vehicle.AddDate)}
+                      {vehicle.owner ? (
+                        <>
+                          <span className="font-medium">{vehicle.owner.phone}</span>
+                          {(vehicle.owner.firstName || vehicle.owner.lastName) && (
+                            <span className="block text-gray-500 text-xs mt-0.5">
+                              {[vehicle.owner.firstName, vehicle.owner.lastName]
+                                .filter(Boolean)
+                                .join(' ')}
+                            </span>
+                          )}
+                          {vehicle.owner.email && (
+                            <span className="block text-gray-400 text-xs">
+                              {vehicle.owner.email}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-gray-400">
+                          userId: {vehicle.userId}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-700">
+                      {formatDate(vehicle.addDate || vehicle.createdAt)}
                     </div>
                   </td>
                 </tr>

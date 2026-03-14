@@ -318,7 +318,9 @@ export default function PushNotificationsPage() {
       };
 
       // Add filters based on sendToType
-      if (sendToType === 'role') {
+      if (sendToType === 'all') {
+        requestBody.broadcastToAll = true;
+      } else if (sendToType === 'role') {
         requestBody.role = role;
         if (activeOnly) {
           requestBody.active = true;
@@ -341,12 +343,15 @@ export default function PushNotificationsPage() {
       }
 
       const result = await res.json();
-      setLastResult({
-        sent: result.sent || result.total || 0,
-        total: result.total || result.sent || 0,
-      });
-      
-      alert(`✅ წარმატებით გაიგზავნა ${result.sent || result.total || 0} მოწყობილობაზე!`);
+      const sent = result.sent ?? result.total ?? 0;
+      const failed = result.failed ?? 0;
+      setLastResult({ sent, total: sent + failed || sent });
+
+      if (failed > 0) {
+        alert(`✅ გაიგზავნა ${sent} მოწყობილობაზე, ვერ გაიგზავნა: ${failed}`);
+      } else {
+        alert(`✅ წარმატებით გაიგზავნა ${sent} მოწყობილობაზე!`);
+      }
       
       setTitle('');
       setBody('');
