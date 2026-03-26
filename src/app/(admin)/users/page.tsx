@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useLayoutEffect, useState, useCallback } from "react";
 import { apiGetJson, apiPatch } from "@/lib/api";
 
 type DeviceTokenSummary = {
@@ -42,6 +42,13 @@ type UserRow = {
 
 export default function UsersPage() {
   const [q, setQ] = useState("");
+
+  /** ბმული /users?q=... (მაგ. რადარებიდან იუზერის ID-ზე) — load-მდე რომ მოხდეს q-ის დაყენება */
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const v = new URLSearchParams(window.location.search).get("q");
+    if (v) setQ(decodeURIComponent(v.trim()));
+  }, []);
   const [role, setRole] = useState("");
   const [active, setActive] = useState<string>("");
   const [subscriptionPlan, setSubscriptionPlan] = useState<string>("");

@@ -35,12 +35,23 @@ export default function SMSMarketingPage() {
   const [activeOnly, setActiveOnly] = useState(true);
   const [smsType, setSmsType] = useState<1 | 2>(1); // 1 = რეკლამა, 2 = ინფორმაციული
 
+  /** მხოლოდ იუზერები, რომლებსაც ჰქონდათ შესვლა 28 დეკემბერი 2025-ის შემდეგ */
+  const LOGIN_AFTER = '2025-12-28T00:00:00.000Z';
+
+  /** აპის ლინკები – დაჭერისას გახსნის აპს ან სტორს (ჩამოტვირთვა) */
+  const APP_LINKS = {
+    ios: 'https://apps.apple.com/app/id6753679575',
+    android: 'https://play.google.com/store/apps/details?id=com.marte.marte',
+    /** ერთი ხაზი ორივესთვის – მიმღები აირჩევს თავის პლატფორმას */
+    both: 'iOS: https://apps.apple.com/app/id6753679575\nAndroid: https://play.google.com/store/apps/details?id=com.marte.marte',
+  };
+
   const loadPhones = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const res = await apiGetJson<{ success: boolean; data: PhoneUser[]; count?: number } | PhoneUser[]>(
-        '/users/phones'
+        `/users/phones?loginAfter=${encodeURIComponent(LOGIN_AFTER)}`
       );
       const data = Array.isArray(res) ? res : (res.data || []);
       setPhones(data);
@@ -236,6 +247,7 @@ export default function SMSMarketingPage() {
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">📱 SMS მარკეტინგი</h1>
         <p className="text-gray-600">გაგზავნეთ SMS შეტყობინებები იუზერებს</p>
+        <p className="text-sm text-amber-700 mt-1">ნაჩვენებია მხოლოდ იუზერები, რომლებსაც ჰქონდათ შესვლა 28 დეკემბერი 2025-ის შემდეგ</p>
       </div>
 
       {/* სტატისტიკა */}
@@ -276,16 +288,40 @@ export default function SMSMarketingPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               შეტყობინება *
             </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              <span className="text-sm text-gray-600">აპის ლინკი (დაჭერისას გახსნის აპს ან სტორს):</span>
+              <button
+                type="button"
+                onClick={() => setMessage((m) => (m ? `${m}\n\nჩამოტვირთე Marte:\n${APP_LINKS.both}` : `ჩამოტვირთე Marte:\n${APP_LINKS.both}`))}
+                className="text-sm px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg hover:bg-amber-200 border border-amber-300"
+              >
+                ჩასვი iOS + Android
+              </button>
+              <button
+                type="button"
+                onClick={() => setMessage((m) => (m ? `${m}\n\n${APP_LINKS.ios}` : `ჩამოტვირთე Marte (iOS): ${APP_LINKS.ios}`))}
+                className="text-sm px-3 py-1.5 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 border border-gray-300"
+              >
+                მხოლოდ iOS
+              </button>
+              <button
+                type="button"
+                onClick={() => setMessage((m) => (m ? `${m}\n\n${APP_LINKS.android}` : `ჩამოტვირთე Marte (Android): ${APP_LINKS.android}`))}
+                className="text-sm px-3 py-1.5 bg-green-100 text-green-800 rounded-lg hover:bg-green-200 border border-green-300"
+              >
+                მხოლოდ Android
+              </button>
+            </div>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="შეიყვანეთ SMS შეტყობინება..."
               rows={4}
-              maxLength={160}
+              maxLength={480}
               className="w-full border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
             <div className="text-sm text-gray-500 mt-1">
-              {message.length} / 160 სიმბოლო
+              {message.length} / 480 სიმბოლო (უფრო გრძელი SMS გაიგზავნება რამდენიმე ნაწილად)
             </div>
           </div>
 

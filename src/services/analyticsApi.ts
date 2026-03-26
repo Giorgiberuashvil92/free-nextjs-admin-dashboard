@@ -1,4 +1,5 @@
 import { apiGetJson } from '@/lib/api';
+import { unwrapApiArray, unwrapApiObject } from '@/lib/unwrapApiResponse';
 
 export interface UserInfo {
   phone: string;
@@ -40,54 +41,76 @@ export interface AllUsersEventsItem {
   lastActivityFormatted?: string;
 }
 
+function normalizeUserBucket(raw: unknown): AllUsersEventsItem | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const events = Array.isArray(o.events) ? (o.events as UserEvent[]) : [];
+  const uid = String(o.userId ?? '');
+  if (!uid && events.length === 0) return null;
+  return {
+    userId: uid || 'unknown',
+    userInfo: o.userInfo as UserInfo | undefined,
+    eventsCount: typeof o.eventsCount === 'number' ? o.eventsCount : events.length,
+    events,
+    lastActivity: typeof o.lastActivity === 'number' ? o.lastActivity : 0,
+    lastActivityFormatted: o.lastActivityFormatted as string | undefined,
+  };
+}
+
 /**
  * Get events for a specific user
- * @param userId - User ID (required)
- * @param period - Time period: 'today' | 'week' | 'month' (default: 'week')
- * @param limit - Events limit (default: 100)
  */
 export async function getUserEvents(
   userId: string,
-  period: 'today' | 'week' | 'month' = 'week',
+  period: 'today' | 'week' | 'month' | 'all' = 'week',
   limit: number = 100
 ): Promise<UserEventsResponse> {
   const params = new URLSearchParams({
     userId,
-    period,
     limit: limit.toString(),
   });
+  if (period !== 'all') {
+    params.set('period', period);
+  }
 
-  const response = await apiGetJson<UserEventsResponse>(`/analytics/user-events?${params.toString()}`);
-  return response || { userId, events: [] };
+  const raw = await apiGetJson<unknown>(`/analytics/user-events?${params.toString()}`);
+  const merged = unwrapApiObject<UserEventsResponse>(
+    raw,
+    { userId, events: [] } as UserEventsResponse
+  );
+  const events = Array.isArray(merged.events) ? merged.events : [];
+  return {
+    ...merged,
+    userId: String(merged.userId || userId),
+    events,
+    totalEvents: merged.totalEvents ?? events.length,
+  };
 }
 
 /**
  * Get events for all users
- * @param period - Time period: 'today' | 'week' | 'month' | 'all' (default: 'week')
- * @param limit - Total events limit (default: 500, use 0 or undefined for no limit)
  */
 export async function getAllUsersEvents(
   period: 'today' | 'week' | 'month' | 'all' = 'week',
   limit?: number
 ): Promise<AllUsersEventsItem[]> {
   const params = new URLSearchParams();
-  
-  // თუ limit არის მითითებული და 0-ზე მეტია, ვამატებთ limit პარამეტრს
-  // თუ limit არ არის მითითებული ან 0-ია, limit პარამეტრს არ ვამატებთ (API-ს ყველა მონაცემი დააბრუნებს)
   if (limit !== undefined && limit > 0) {
     params.append('limit', limit.toString());
   }
-  
-  // თუ period არის 'all', არ ვამატებთ period პარამეტრს
   if (period !== 'all') {
     params.append('period', period);
   }
 
   const queryString = params.toString();
-  const url = queryString 
-    ? `/analytics/all-users-events?${queryString}`
-    : '/analytics/all-users-events';
-    
-  const response = await apiGetJson<AllUsersEventsItem[]>(url);
-  return Array.isArray(response) ? response : [];
+  const url = queryString ? `/analytics/all-users-events?${queryString}` : '/analytics/all-users-events';
+
+  const raw = await apiGetJson<unknown>(url);
+  const arr = unwrapApiArray<unknown>(raw);
+  const out: AllUsersEventsItem[] = [];
+  for (const item of arr) {
+    const n = normalizeUserBucket(item);
+    if (n) out.push(n);
+  }
+  return out;
 }

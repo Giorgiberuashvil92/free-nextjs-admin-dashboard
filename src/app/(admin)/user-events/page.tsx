@@ -9,7 +9,7 @@ function UserEventsContent() {
   const urlUserId = searchParams?.get('userId') || '';
   
   const [viewMode, setViewMode] = useState<'all' | 'user'>(urlUserId ? 'user' : 'all');
-  const [period, setPeriod] = useState<'today' | 'week' | 'month'>('week');
+  const [period, setPeriod] = useState<'today' | 'week' | 'month' | 'all'>('week');
   const [limit, setLimit] = useState<number>(500);
   const [userId, setUserId] = useState<string>(urlUserId);
   const [loading, setLoading] = useState(false);
@@ -23,6 +23,8 @@ function UserEventsContent() {
   
   // For all users view
   const [allUsersEvents, setAllUsersEvents] = useState<AllUsersEventsItem[]>([]);
+  const [allUsersEventType, setAllUsersEventType] = useState<string>('all');
+  const [allUsersSearch, setAllUsersSearch] = useState<string>('');
   
   // For single user view
   const [userEventsData, setUserEventsData] = useState<UserEventsResponse | null>(null);
@@ -82,6 +84,44 @@ function UserEventsContent() {
     setCurrentPage(1); // Reset to first page when filters change
   }, [eventTypeFilter, searchQuery, viewMode]);
 
+  const allUsersEventTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const u of allUsersEvents) {
+      for (const e of u.events || []) {
+        if (e.eventType) types.add(e.eventType);
+      }
+    }
+    return Array.from(types).sort();
+  }, [allUsersEvents]);
+
+  const filteredAllUsersEvents = useMemo(() => {
+    let list = allUsersEvents;
+    if (allUsersEventType !== 'all') {
+      list = list
+        .map((u) => {
+          const ev = (u.events || []).filter((e) => e.eventType === allUsersEventType);
+          return { ...u, events: ev, eventsCount: ev.length };
+        })
+        .filter((u) => u.events.length > 0);
+    }
+    const q = allUsersSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((u) => {
+        const phone = (u.userInfo?.phone || '').toLowerCase();
+        const name = `${u.userInfo?.firstName || ''} ${u.userInfo?.lastName || ''}`.toLowerCase().trim();
+        const id = (u.userId || '').toLowerCase();
+        const inMeta = id.includes(q) || phone.includes(q) || name.includes(q);
+        const inEvents = (u.events || []).some(
+          (e) =>
+            e.eventName.toLowerCase().includes(q) ||
+            (e.screen || '').toLowerCase().includes(q) ||
+            (e.eventType || '').toLowerCase().includes(q)
+        );
+        return inMeta || inEvents;
+      });
+    }
+    return list;
+  }, [allUsersEvents, allUsersEventType, allUsersSearch]);
 
   // Filter and search events
   const filteredEvents = useMemo(() => {
@@ -248,12 +288,13 @@ function UserEventsContent() {
               <label className="block text-sm font-medium mb-2">პერიოდი</label>
               <select
                 value={period}
-                onChange={(e) => setPeriod(e.target.value as 'today' | 'week' | 'month')}
+                onChange={(e) => setPeriod(e.target.value as 'today' | 'week' | 'month' | 'all')}
                 className="w-full border rounded px-3 py-2"
               >
                 <option value="today">დღეს</option>
                 <option value="week">კვირა</option>
                 <option value="month">თვე</option>
+                <option value="all">ყველა დრო</option>
               </select>
             </div>
 
@@ -282,6 +323,44 @@ function UserEventsContent() {
               </button>
             </div>
           )}
+
+          {viewMode === 'all' && (
+            <div className="mt-4 flex flex-wrap gap-3 items-end">
+              <div className="min-w-[180px] flex-1">
+                <label className="block text-sm font-medium mb-2">ფილტრი ტიპით (ყველა მომხმარებელი)</label>
+                <select
+                  value={allUsersEventType}
+                  onChange={(e) => setAllUsersEventType(e.target.value)}
+                  className="w-full border rounded px-3 py-2 dark:bg-gray-900 dark:border-gray-600"
+                >
+                  <option value="all">ყველა ტიპი</option>
+                  {allUsersEventTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="min-w-[200px] flex-[2]">
+                <label className="block text-sm font-medium mb-2">ძიება (ID, ტელეფონი, სახელი, ეკრანი...)</label>
+                <input
+                  type="text"
+                  value={allUsersSearch}
+                  onChange={(e) => setAllUsersSearch(e.target.value)}
+                  placeholder="მაგ: usr_ ან ეკრანის სახელი"
+                  className="w-full border rounded px-3 py-2 dark:bg-gray-900 dark:border-gray-600"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => void loadAllUsersEvents()}
+                disabled={loading}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 h-[42px]"
+              >
+                {loading ? 'იტვირთება...' : 'განახლება'}
+              </button>
+            </div>
+          )}
         </div>
 
         {error && (
@@ -294,15 +373,25 @@ function UserEventsContent() {
       {/* All Users View */}
       {viewMode === 'all' && (
         <div>
+          {!loading && allUsersEvents.length > 0 && (
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+              ნაჩვენებია <strong>{filteredAllUsersEvents.length}</strong> მომხმარებელი{' '}
+              (სულ ჩატვირთული: {allUsersEvents.length})
+            </p>
+          )}
           {loading ? (
             <div className="text-center py-8">იტვირთება...</div>
           ) : allUsersEvents.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               მოვლენები არ მოიძებნა
             </div>
+          ) : filteredAllUsersEvents.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              ფილტრით შედეგი არ მოიძებნა — სცადეთ სხვა ძიება ან ტიპი.
+            </div>
           ) : (
             <div className="space-y-4">
-              {allUsersEvents.map((userData) => (
+              {filteredAllUsersEvents.map((userData) => (
                 <div
                   key={userData.userId}
                   className="bg-white dark:bg-gray-800 border rounded-lg p-4"

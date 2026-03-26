@@ -2,6 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { apiGetJson } from '@/lib/api';
+import { unwrapApiArray, unwrapStatsPayload } from '@/lib/unwrapApiResponse';
+
+function numFromStats(v: unknown, def = 0): number {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : def;
+}
 
 interface AnalyticsData {
   totalUsers: number;
@@ -46,74 +53,71 @@ export default function AnalyticsPage() {
     try {
       setLoading(true);
       
-      // Login statistics
-      const loginStats = await apiGetJson<{
-        success: boolean;
-        data: {
-          totalLogins: number;
-          loginsToday: number;
-          uniqueUsers: number;
-          uniqueUsersToday: number;
-        };
-      }>('/login-history/stats').catch(() => ({ success: false, data: null }));
+      // Login statistics (მასივი ან { data })
+      const loginRaw = await apiGetJson<unknown>('/login-history/stats').catch(() => null);
+      const loginPayload = unwrapStatsPayload(loginRaw);
 
       // Payment statistics
-      const paymentStats = await apiGetJson<{
-        success: boolean;
-        data: {
-          totalPayments?: number;
-          totalAmount?: number;
-          paymentsByMethod?: Array<{ _id: string; count: number; total: number }>;
-          paymentsByContext?: Array<{ _id: string; count: number; total: number }>;
-        };
-      }>('/api/payments/stats').catch(() => ({ success: false, data: null }));
+      const paymentRaw = await apiGetJson<unknown>('/api/payments/stats').catch(() => null);
+      const payPayload = unwrapStatsPayload(paymentRaw);
 
       // Calculate today's payments
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayPayments = await apiGetJson<any[]>('/api/payments').catch(() => []);
-      const paymentsToday = Array.isArray(todayPayments) 
-        ? todayPayments.filter((p: any) => {
-            const paymentDate = p.paymentDate ? new Date(p.paymentDate) : (p.createdAt ? new Date(p.createdAt) : null);
-            return paymentDate && paymentDate >= today;
-          }).length
-        : 0;
-      const revenueToday = Array.isArray(todayPayments)
-        ? todayPayments
-            .filter((p: any) => {
-              const paymentDate = p.paymentDate ? new Date(p.paymentDate) : (p.createdAt ? new Date(p.createdAt) : null);
-              return paymentDate && paymentDate >= today && p.status === 'completed';
-            })
-            .reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
-        : 0;
+      const todayPaymentsRaw = await apiGetJson<unknown>('/api/payments').catch(() => []);
+      const todayPayments = unwrapApiArray<Record<string, unknown>>(todayPaymentsRaw);
+      const paymentsToday = todayPayments.filter((p) => {
+        const paymentDate = p.paymentDate ? new Date(String(p.paymentDate)) : p.createdAt ? new Date(String(p.createdAt)) : null;
+        return paymentDate && paymentDate >= today;
+      }).length;
+      const revenueToday = todayPayments
+        .filter((p) => {
+          const paymentDate = p.paymentDate ? new Date(String(p.paymentDate)) : p.createdAt ? new Date(String(p.createdAt)) : null;
+          return paymentDate && paymentDate >= today && p.status === 'completed';
+        })
+        .reduce((sum, p) => sum + numFromStats(p.amount, 0), 0);
 
       // Services count
-      const servicesData = await apiGetJson<any[]>('/services/all?limit=1').catch(() => []);
-      const carwashesData = await apiGetJson<any[]>('/carwash/locations').catch(() => []);
-      const storesData = await apiGetJson<any[]>('/stores').catch(() => []);
-      const dismantlersData = await apiGetJson<{ success: boolean; data?: any[] }>('/dismantlers').catch(() => ({ success: false, data: [] }));
-      const carRentalsData = await apiGetJson<any[]>('/car-rental').catch(() => []);
-      const subscriptionsData = await apiGetJson<{ success: boolean; data?: any[] }>('/api/payments/subscriptions').catch(() => ({ success: false, data: [] }));
+      const servicesRaw = await apiGetJson<unknown>('/services/all?limit=1').catch(() => []);
+      const servicesList = unwrapApiArray<unknown>(servicesRaw);
+      let totalServicesCount = servicesList.length;
+      if (servicesRaw && typeof servicesRaw === 'object' && servicesRaw !== null && 'total' in servicesRaw) {
+        const t = (servicesRaw as { total?: unknown }).total;
+        if (typeof t === 'number') totalServicesCount = t;
+      }
 
-      // Calculate counts
-      const totalCarwashes = Array.isArray(carwashesData) ? carwashesData.length : 0;
-      const totalStores = Array.isArray(storesData) ? storesData.length : 0;
-      const totalDismantlers = Array.isArray(dismantlersData?.data) ? dismantlersData.data.length : (Array.isArray(dismantlersData) ? dismantlersData.length : 0);
-      const totalCarRentals = Array.isArray(carRentalsData) ? carRentalsData.length : 0;
-      const subscriptions = Array.isArray(subscriptionsData?.data) ? subscriptionsData.data : (Array.isArray(subscriptionsData) ? subscriptionsData : []);
+      const carwashesRaw = await apiGetJson<unknown>('/carwash/locations').catch(() => []);
+      const storesRaw = await apiGetJson<unknown>('/stores').catch(() => []);
+      const dismantlersRaw = await apiGetJson<unknown>('/dismantlers').catch(() => ({}));
+      const carRentalsRaw = await apiGetJson<unknown>('/car-rental').catch(() => []);
+      const subscriptionsRaw = await apiGetJson<unknown>('/api/payments/subscriptions').catch(() => []);
+
+      const carwashesList = unwrapApiArray<unknown>(carwashesRaw);
+      const storesList = unwrapApiArray<unknown>(storesRaw);
+      const dismantlersList = unwrapApiArray<unknown>(dismantlersRaw);
+      const carRentalsList = unwrapApiArray<unknown>(carRentalsRaw);
+      const subscriptions = unwrapApiArray<Record<string, unknown>>(subscriptionsRaw);
+
+      const totalCarwashes = carwashesList.length;
+      const totalStores = storesList.length;
+      const totalDismantlers = dismantlersList.length;
+      const totalCarRentals = carRentalsList.length;
       const totalSubscriptions = subscriptions.length;
-      const activeSubscriptions = subscriptions.filter((s: any) => s.status === 'active').length;
+      const activeSubscriptions = subscriptions.filter((s) => s.status === 'active').length;
+
+      const totalPayments = numFromStats(payPayload?.totalPayments);
+      const totalAmount = numFromStats(payPayload?.totalAmount);
 
       const analyticsData: AnalyticsData = {
-        totalUsers: loginStats.data?.uniqueUsers || 0,
-        activeUsers: loginStats.data?.uniqueUsersToday || 0,
-        totalLogins: loginStats.data?.totalLogins || 0,
-        loginsToday: loginStats.data?.loginsToday || 0,
+        totalUsers: numFromStats(loginPayload?.uniqueUsers),
+        activeUsers: numFromStats(loginPayload?.uniqueUsersToday),
+        totalLogins: numFromStats(loginPayload?.totalLogins),
+        loginsToday: numFromStats(loginPayload?.loginsToday),
         totalBookings: 0, // TODO: Add bookings endpoint
         bookingsToday: 0, // TODO: Add bookings endpoint
-        totalServices: Array.isArray(servicesData) ? servicesData.length : 0,
+        totalServices: totalServicesCount,
         totalParts: 0, // TODO: Add parts count
-        revenue: paymentStats.data?.totalAmount || 0,
+        revenue: totalAmount,
         revenueToday: revenueToday,
         totalCarwashes,
         totalStores,
@@ -121,20 +125,20 @@ export default function AnalyticsPage() {
         totalCarRentals,
         totalSubscriptions,
         activeSubscriptions,
-        totalPayments: paymentStats.data?.totalPayments || 0,
+        totalPayments: totalPayments,
         paymentsToday: paymentsToday,
-        averagePayment: paymentStats.data?.totalPayments && paymentStats.data?.totalAmount 
-          ? (paymentStats.data.totalAmount / paymentStats.data.totalPayments) 
-          : 0,
+        averagePayment: totalPayments > 0 && totalAmount > 0 ? totalAmount / totalPayments : 0,
         subscriptionRevenue: subscriptions
           .filter((s: any) => s.status === 'active')
           .reduce((sum: number, s: any) => sum + (s.planPrice || 0), 0),
       };
 
       setAnalytics(analyticsData);
+      const byMethod = payPayload?.paymentsByMethod;
+      const byContext = payPayload?.paymentsByContext;
       setPaymentStats({
-        paymentsByMethod: paymentStats.data?.paymentsByMethod || [],
-        paymentsByContext: paymentStats.data?.paymentsByContext || [],
+        paymentsByMethod: Array.isArray(byMethod) ? (byMethod as PaymentStats['paymentsByMethod']) : [],
+        paymentsByContext: Array.isArray(byContext) ? (byContext as PaymentStats['paymentsByContext']) : [],
       });
     } catch (error) {
       console.error('Error loading analytics:', error);

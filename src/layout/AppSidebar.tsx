@@ -198,6 +198,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "შესვლის ანალიტიკა",
+    path: "/engagement-analytics",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "დღევანდელი შესვლები",
     path: "/today-logins",
   },
@@ -230,6 +235,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "ფიდბექები",
     path: "/feedback",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "ექსკლუზიური შეთავაზება",
+    path: "/exclusive-offer-requests",
   },
   {
     icon: <PieChartIcon />,
