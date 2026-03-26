@@ -155,6 +155,7 @@ export default function PushNotificationsPage() {
   const [syncAllLoading, setSyncAllLoading] = useState(false);
   const [manualTitle, setManualTitle] = useState('🚨 ჯარიმების შეხსენება');
   const [manualBody, setManualBody] = useState('გადაამოწმე ახალი ჯარიმები აპში — შესაძლოა გაქვს გადასახდელი ჩანაწერები.');
+  const [deleteSaId, setDeleteSaId] = useState('');
 
   /** Load consent data */
   const loadConsent = useCallback(async () => {
@@ -500,6 +501,36 @@ export default function PushNotificationsPage() {
     }
   };
 
+  const handleDeleteVehicleBySaId = async () => {
+    const id = Number(deleteSaId);
+    if (!Number.isFinite(id) || id <= 0) {
+      alert('შეიყვანე სწორი SA ID');
+      return;
+    }
+    if (!confirm(`ნამდვილად გსურს SA ID ${id}-ის წაშლა?`)) return;
+    setFinesActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/fines/vehicles/sa/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || `HTTP error: ${res.status}`);
+      }
+      const result = await res.json();
+      alert(
+        `✅ შესრულდა\nSA delete: ${result.saDeleted ? 'კი' : 'არა'}\nDB deactivated: ${result.dbDeactivated}\nSubs cancelled: ${result.subscriptionsCancelled}`,
+      );
+      setDeleteSaId('');
+      await handleSyncAllAndLoadUnpaid();
+    } catch (error) {
+      console.error('Error deleting vehicle by SA ID:', error);
+      alert(`❌ წაშლა ვერ შესრულდა: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setFinesActionLoading(false);
+    }
+  };
+
   /** Render helpers */
   const SummaryCard = ({ label, value, color }: { label: string; value: number; color: string }) => (
     <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
@@ -758,6 +789,24 @@ export default function PushNotificationsPage() {
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm disabled:opacity-50"
             >
               {finesActionLoading ? 'იგზავნება...' : `1 ტექსტის გაგზავნა ყველასთან (${unpaidUsers.length})`}
+            </button>
+          </div>
+
+          <div className="border-t border-gray-200 pt-3 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <input
+              type="number"
+              value={deleteSaId}
+              onChange={(e) => setDeleteSaId(e.target.value)}
+              placeholder="SA ID წასაშლელად (მაგ: 840800)"
+              className="w-full border border-red-300 rounded-lg px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleDeleteVehicleBySaId}
+              disabled={finesActionLoading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm disabled:opacity-50"
+            >
+              {finesActionLoading ? 'იგზავნება...' : 'SA ID-ით წაშლა'}
             </button>
           </div>
         </div>
