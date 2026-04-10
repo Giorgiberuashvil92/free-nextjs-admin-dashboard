@@ -9,7 +9,7 @@ export function getMarteBackendBaseUrl(): string {
 
 /** სერვერული როუტებისთვის: თუ null — env არ არის დაყენებული */
 export function getSupportChatAgentKeyOrNull(): string | null {
-  const raw = process.env.SUPPORT_CHAT_AGENT_KEY;
+  const raw = '93895d70df800502145289553cd971ddc078d96ff4c71824a40a500d0ede4e01';
   if (!raw?.trim()) return null;
   let s = raw.trim();
   if (
