@@ -1,3 +1,7 @@
+/** Marte-თან იგივე SUPPORT_CHAT_AGENT_KEY — ჩაფიქსირებულია admin-ში; .env არ არის სავალდებო. */
+const SUPPORT_CHAT_AGENT_KEY_EMBEDDED =
+  "93895d70df800502145289553cd971ddc078d96ff4c71824a40a500d0ede4e01";
+
 /** Marte API ბაზა (სერვერული როუტებისთვის) */
 export function getMarteBackendBaseUrl(): string {
   const u =
@@ -7,10 +11,7 @@ export function getMarteBackendBaseUrl(): string {
   return u.replace(/\/$/, "");
 }
 
-/** სერვერული როუტებისთვის: თუ null — env არ არის დაყენებული */
-export function getSupportChatAgentKeyOrNull(): string | null {
-  const raw = '93895d70df800502145289553cd971ddc078d96ff4c71824a40a500d0ede4e01';
-  if (!raw?.trim()) return null;
+function normalizeAgentKey(raw: string): string {
   let s = raw.trim();
   if (
     (s.startsWith('"') && s.endsWith('"')) ||
@@ -18,9 +19,18 @@ export function getSupportChatAgentKeyOrNull(): string | null {
   ) {
     s = s.slice(1, -1).trim();
   }
-  return s || null;
+  return s;
 }
 
-/** UI/API ტექსტი — როცა key აკლია */
-export const SUPPORT_CHAT_AGENT_KEY_MISSING_MESSAGE =
-  "SUPPORT_CHAT_AGENT_KEY არ არის ჩასმული. ლოკალურად: free-nextjs-admin-dashboard/.env.local ფაილში ჩაწერე იგივე მნიშვნელობა, რაც marte-backend/.env-ში SUPPORT_CHAT_AGENT_KEY. პროდაქშენში: Vercel → Project → Settings → Environment Variables. შაბლონი: .env.example";
+/**
+ * სერვერული API როუტებისთვის — ყოველთვის აბრუნებს key-ს.
+ * ოფციონალური override: `SUPPORT_CHAT_AGENT_KEY` .env / Vercel-ში.
+ */
+export function getSupportChatAgentKey(): string {
+  const fromEnv = process.env.SUPPORT_CHAT_AGENT_KEY;
+  if (fromEnv?.trim()) {
+    const n = normalizeAgentKey(fromEnv);
+    if (n) return n;
+  }
+  return SUPPORT_CHAT_AGENT_KEY_EMBEDDED;
+}

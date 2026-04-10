@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  getMarteBackendBaseUrl,
-  getSupportChatAgentKeyOrNull,
-  SUPPORT_CHAT_AGENT_KEY_MISSING_MESSAGE,
-} from "@/lib/supportChatMarte";
+import { getMarteBackendBaseUrl, getSupportChatAgentKey } from "@/lib/supportChatMarte";
 
 export async function POST(request: Request) {
   try {
@@ -11,13 +7,7 @@ export async function POST(request: Request) {
       userId?: string;
       text?: string;
     };
-    const key = getSupportChatAgentKeyOrNull();
-    if (!key) {
-      return NextResponse.json(
-        { error: SUPPORT_CHAT_AGENT_KEY_MISSING_MESSAGE },
-        { status: 503 },
-      );
-    }
+    const key = getSupportChatAgentKey();
     const res = await fetch(
       `${getMarteBackendBaseUrl()}/support-chat/agent/reply`,
       {
