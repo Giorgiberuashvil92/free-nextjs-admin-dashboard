@@ -338,8 +338,18 @@ export default function CarBrandsPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {brands.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="px-4 py-8 text-center text-gray-500">
-                    ბრენდები არ მოიძებნა
+                  <td colSpan={3} className="px-4 py-8 text-center text-gray-500 space-y-2">
+                    <p className="font-medium text-gray-700 dark:text-gray-300">
+                      ბრენდები არ მოიძებნა
+                    </p>
+                    <p className="text-sm max-w-xl mx-auto">
+                      მონაცემები მოდის API-დან <code className="text-xs bg-gray-100 dark:bg-gray-900 px-1 rounded">GET /car-brands</code>
+                      (MongoDB <code className="text-xs bg-gray-100 dark:bg-gray-900 px-1 rounded">carbrands</code>).
+                      თუ ბაზა ცარიელია, ლოკალურად გაუშვი:{" "}
+                      <code className="text-xs bg-gray-100 dark:bg-gray-900 px-1 rounded">
+                        cd marte-backend && npm run import:myauto-brands -- --apply
+                      </code>
+                    </p>
                   </td>
                 </tr>
               ) : (

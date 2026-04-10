@@ -67,6 +67,11 @@ const navItems: NavItem[] = [
     path: "/requests",
   },
   {
+    icon: <PlugInIcon />,
+    name: "საპორტის ჩატი",
+    path: "/support-chat",
+  },
+  {
     icon: <PieChartIcon />,
     name: "სტორიები",
     path: "/stories",

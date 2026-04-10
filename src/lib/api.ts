@@ -1,8 +1,18 @@
 const BACKEND_URL = "https://marte-backend-production.up.railway.app";
-// Use proxy in development to avoid CORS issues
-const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-  ? '/api/proxy' 
-  : BACKEND_URL;
+
+/** ლოკალური ადმინი: ყოველთვის /api/proxy, რომ CORS არ დაირღვეს (localhost, 127.0.0.1, ::1). */
+function shouldUseAdminProxy(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hostname;
+  return (
+    h === 'localhost' ||
+    h === '127.0.0.1' ||
+    h === '[::1]' ||
+    h === '::1'
+  );
+}
+
+const API_BASE = shouldUseAdminProxy() ? '/api/proxy' : BACKEND_URL;
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
