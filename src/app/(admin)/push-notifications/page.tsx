@@ -41,6 +41,7 @@ type NotificationType =
   | 'subscription_activated'
   | 'garage_reminder'
   | 'chat_message'
+  | 'support_chat'
   | 'carwash_booking'
   | 'new_request'
   | 'new_offer'
@@ -95,6 +96,14 @@ const NOTIFICATION_TYPES: NotificationTypeConfig[] = [
   { type: 'subscription_activated', label: 'Subscription Activated', screen: 'Premium', icon: '💎', description: 'გადავა Home-ზე Premium Modal-ით' },
   { type: 'garage_reminder', label: 'Garage Reminder', screen: 'Garage', icon: '⏰', description: 'გადავა Garage სქრინზე' },
   { type: 'chat_message', label: 'Chat Message', screen: 'Chat', icon: '💬', description: 'გადავა Chat სქრინზე' },
+  {
+    type: 'support_chat',
+    label: 'საპორტი (ჩატი)',
+    screen: 'support-chat',
+    icon: '🛟',
+    description:
+      'აპში გადავა საპორტის საუბარზე (/support-chat/conversation) — იგივე type/screen რაც pushNavigation / UserContext',
+  },
   { type: 'carwash_booking', label: 'Carwash Booking', screen: 'Bookings', icon: '🚿', description: 'გადავა Bookings სქრინზე' },
   { type: 'new_request', label: 'New Request', screen: 'RequestDetails', icon: '🆕', description: 'გადავა Offers/Request სქრინზე' },
   { type: 'new_offer', label: 'New Offer', screen: 'OfferDetails', icon: '💰', description: 'გადავა Offers სქრინზე' },
