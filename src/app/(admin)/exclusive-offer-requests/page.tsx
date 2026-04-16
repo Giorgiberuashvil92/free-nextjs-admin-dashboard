@@ -24,6 +24,11 @@ type ListResponse = {
   total: number;
   limit: number;
   offset: number;
+  stats?: {
+    uniqueUsersToday: number;
+    uniqueUsersYesterday: number;
+    uniqueUsersLast7Days: number;
+  };
 };
 
 /** იგივე პირადი №-ის ყველა ჩანაწერი ერთად ინახება (დარეკვა / შენიშვნა). */
@@ -33,15 +38,29 @@ function syncKey(r: Row): string {
   return `id:${String(r.id || r._id || "")}`;
 }
 
+/** ქრონოლოგიურად (ახალი ზევით); იგივე წამზე სტაბილურობისთვის — personalId. */
 function sortRowsForDisplay(list: Row[]): Row[] {
   return [...list].sort((a, b) => {
+    const ta = new Date(parseCreatedAt(a.createdAt) ?? 0).getTime();
+    const tb = new Date(parseCreatedAt(b.createdAt) ?? 0).getTime();
+    if (tb !== ta) return tb - ta;
     const pa = (a.personalId ?? "").trim().replace(/\s/g, "") || "\uffff";
     const pb = (b.personalId ?? "").trim().replace(/\s/g, "") || "\uffff";
-    if (pa !== pb) return pa.localeCompare(pb);
-    const ta = new Date(a.createdAt ?? 0).getTime();
-    const tb = new Date(b.createdAt ?? 0).getTime();
-    return tb - ta;
+    return pa.localeCompare(pb);
   });
+}
+
+function parseCreatedAt(raw: unknown): string | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return new Date(raw).toISOString();
+  }
+  if (typeof raw === "object" && raw !== null && "$date" in raw) {
+    const d = (raw as { $date?: string | number }).$date;
+    if (typeof d === "string" || typeof d === "number") return String(d);
+  }
+  return undefined;
 }
 
 export default function ExclusiveOfferRequestsPage() {
@@ -57,6 +76,7 @@ export default function ExclusiveOfferRequestsPage() {
   );
   const [savingCalled, setSavingCalled] = useState<Record<string, boolean>>({});
   const [savingNote, setSavingNote] = useState<Record<string, boolean>>({});
+  const [stats, setStats] = useState<ListResponse["stats"]>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,6 +95,7 @@ export default function ExclusiveOfferRequestsPage() {
         }));
         setRows(sortRowsForDisplay(normalized));
         setTotal(res.total ?? 0);
+        setStats(res.stats);
         setNoteDraftBySync({});
       } else {
         setError("ჩატვირთვა ვერ მოხერხდა");
@@ -94,8 +115,11 @@ export default function ExclusiveOfferRequestsPage() {
     load();
   }, [load]);
 
-  const formatDate = (s?: string) => {
-    if (!s) return "—";
+  const formatDate = (s?: unknown) => {
+    const iso = parseCreatedAt(s);
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
     try {
       return new Intl.DateTimeFormat("ka-GE", {
         timeZone: "Asia/Tbilisi",
@@ -104,9 +128,10 @@ export default function ExclusiveOfferRequestsPage() {
         day: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-      }).format(new Date(s));
+        second: "2-digit",
+      }).format(d);
     } catch {
-      return s;
+      return iso;
     }
   };
 
@@ -185,9 +210,34 @@ export default function ExclusiveOfferRequestsPage() {
           Marte — ექსკლუზიური საწვავის შეთავაზება — მომხმარებლების მონაცემები
         </p>
         <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-          მთელი სტრიქონი მწვანეა თუ «დავრეკეთ» მონიშნულია, წითელი — თუ ჯერ არ დაგირეკავთ. იგივე პირადი ნომრის ყველა განაცხადი ერთად ინახება და სიაში ერთმანეთთან არის დახარისხებული.
+          მთელი სტრიქონი მწვანეა თუ «დავრეკეთ» მონიშნულია, წითელი — თუ ჯერ არ დაგირეკავთ. სია დალაგებულია გაგზავნის დროით (ახალი ზევით, თბილისის დროით ჩვენება). იგივე პირადი ნომრის განაცხადებზე დარეკვა/შენიშვნა ერთად ინახება.
         </p>
       </div>
+
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-4 py-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400">უნიკალური განმცხადებელი — დღეს</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">
+              {stats.uniqueUsersToday}
+            </div>
+            <div className="text-[11px] text-gray-400 mt-0.5">პირადი № (დღის მიხედვით, Asia/Tbilisi)</div>
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-4 py-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400">უნიკალური განმცხადებელი — გუშინ</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">
+              {stats.uniqueUsersYesterday}
+            </div>
+          </div>
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-4 py-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400">უნიკალური განმცხადებელი — ბოლო 7 დღე</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">
+              {stats.uniqueUsersLast7Days}
+            </div>
+            <div className="text-[11px] text-gray-400 mt-0.5">კალენდარული 7 დღე (დღეს ჩათვლით)</div>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-md text-red-700">
