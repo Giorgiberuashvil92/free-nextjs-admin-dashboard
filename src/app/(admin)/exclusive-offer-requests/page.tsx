@@ -27,7 +27,8 @@ type ListResponse = {
   stats?: {
     uniqueUsersToday: number;
     uniqueUsersYesterday: number;
-    uniqueUsersLast7Days: number;
+    /** უნიკალური პირადი № — ყველა დროის ბაზაში */
+    uniqueUsersAllTime: number;
   };
 };
 
@@ -230,11 +231,18 @@ export default function ExclusiveOfferRequestsPage() {
             </div>
           </div>
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-4 py-3">
-            <div className="text-xs text-gray-500 dark:text-gray-400">უნიკალური განმცხადებელი — ბოლო 7 დღე</div>
-            <div className="text-2xl font-semibold tabular-nums mt-1">
-              {stats.uniqueUsersLast7Days}
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              უნიკალური პირადი № — სულ (ყველა დრო)
             </div>
-            <div className="text-[11px] text-gray-400 mt-0.5">კალენდარული 7 დღე (დღეს ჩათვლით)</div>
+            <div className="text-2xl font-semibold tabular-nums mt-1">
+              {stats.uniqueUsersAllTime ?? "—"}
+            </div>
+            <div className="text-[11px] text-gray-400 mt-0.5">
+              განსხვავებული პირადი ნომერი ბაზაში; გაგზავნების სულ:{" "}
+              <span className="tabular-nums font-medium text-gray-600 dark:text-gray-300">
+                {total}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -253,7 +261,9 @@ export default function ExclusiveOfferRequestsPage() {
         >
           განახლება
         </button>
-        <div className="text-sm text-gray-500">სულ: {total}</div>
+        <div className="text-sm text-gray-500">
+          სულ (ყველა დრო): <span className="tabular-nums font-medium">{total}</span>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
