@@ -32,6 +32,53 @@ type ListResponse = {
   };
 };
 
+type UniqueExportRow = {
+  firstName: string;
+  lastName: string;
+  personalId: string;
+  phone: string;
+  email: string;
+};
+
+type UniqueListResponse = {
+  success: boolean;
+  scope: string;
+  data: UniqueExportRow[];
+};
+
+function csvEscapeCell(s: string): string {
+  const t = String(s ?? "");
+  if (/[",\n\r]/.test(t)) return `"${t.replace(/"/g, '""')}"`;
+  return t;
+}
+
+/** UTF-8 BOM + `;` — Excel-ში (განსაკუთრებით EU ლოკალით) ქართული ტექსტი სწორად იხსნება. */
+function uniqueRowsToCsvSemicolon(rows: UniqueExportRow[]): string {
+  const header = ["სახელი", "გვარი", "პირადი №", "ტელეფონი", "ელ. ფოსტა"];
+  const lines = [
+    header.join(";"),
+    ...rows.map((r) =>
+      [r.firstName, r.lastName, r.personalId, r.phone, r.email]
+        .map(csvEscapeCell)
+        .join(";"),
+    ),
+  ];
+  return `\uFEFF${lines.join("\r\n")}`;
+}
+
+function downloadTextFile(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** იგივე პირადი №-ის ყველა ჩანაწერი ერთად ინახება (დარეკვა / შენიშვნა). */
 function syncKey(r: Row): string {
   const pid = (r.personalId ?? "").trim().replace(/\s/g, "");
@@ -78,6 +125,9 @@ export default function ExclusiveOfferRequestsPage() {
   const [savingCalled, setSavingCalled] = useState<Record<string, boolean>>({});
   const [savingNote, setSavingNote] = useState<Record<string, boolean>>({});
   const [stats, setStats] = useState<ListResponse["stats"]>(undefined);
+  const [exportingScope, setExportingScope] = useState<
+    "all" | "today" | "yesterday" | null
+  >(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,6 +161,39 @@ export default function ExclusiveOfferRequestsPage() {
       setLoading(false);
     }
   }, [limit, offset]);
+
+  const exportUniqueCsv = useCallback(
+    async (scope: "all" | "today" | "yesterday") => {
+      setExportingScope(scope);
+      setError("");
+      try {
+        const res = await apiGetJson<UniqueListResponse>(
+          `/exclusive-offer-requests/unique-list?scope=${scope}`,
+        );
+        if (!res.success || !Array.isArray(res.data)) {
+          setError("ექსპორტი ვერ მოხერხდა");
+          return;
+        }
+        const ymd = new Date().toLocaleDateString("en-CA", {
+          timeZone: "Asia/Tbilisi",
+        });
+        const csv = uniqueRowsToCsvSemicolon(res.data);
+        downloadTextFile(
+          csv,
+          `exclusive-offer-unique-${scope}-${ymd}.csv`,
+        );
+      } catch (e: unknown) {
+        const msg =
+          e && typeof e === "object" && "message" in e
+            ? String((e as { message?: string }).message)
+            : "ექსპორტი ვერ მოხერხდა";
+        setError(msg);
+      } finally {
+        setExportingScope(null);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     load();
@@ -246,6 +329,41 @@ export default function ExclusiveOfferRequestsPage() {
           </div>
         </div>
       )}
+
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-900/30 px-4 py-3 space-y-2">
+        <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+          ექსპორტი Excel-ისთვის (CSV)
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          თითო პირადი ნომერზე ერთი სტრიქონი — ბოლო გაგზავნის სახელი, ტელეფონი და ელფოსტა. ფაილი გაიხსნება Excel-ში (გახსნისას UTF-8 აირჩიეთ, თუ სიმბოლოები არასწორია).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={exportingScope !== null}
+            onClick={() => exportUniqueCsv("today")}
+            className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm disabled:opacity-50"
+          >
+            {exportingScope === "today" ? "…" : "უნიკალური — დღეს"}
+          </button>
+          <button
+            type="button"
+            disabled={exportingScope !== null}
+            onClick={() => exportUniqueCsv("yesterday")}
+            className="px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm disabled:opacity-50"
+          >
+            {exportingScope === "yesterday" ? "…" : "უნიკალური — გუშინ"}
+          </button>
+          <button
+            type="button"
+            disabled={exportingScope !== null}
+            onClick={() => exportUniqueCsv("all")}
+            className="px-3 py-1.5 rounded-lg border border-gray-800 dark:border-gray-500 bg-gray-900 text-white dark:bg-gray-800 text-sm disabled:opacity-50"
+          >
+            {exportingScope === "all" ? "…" : "უნიკალური — სულ (ყველა დრო)"}
+          </button>
+        </div>
+      </div>
 
       {error && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 rounded-md text-red-700">
