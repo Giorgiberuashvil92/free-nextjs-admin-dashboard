@@ -167,7 +167,7 @@ function UserEventsContent() {
     
     const headers = ['დრო', 'ტიპი', 'სახელი', 'ეკრანი', 'პარამეტრები'];
     const rows = filteredEvents.map(event => [
-      event.dateFormatted || formatDate(event.date || event.timestamp),
+      formatEventDate(event),
       event.eventType,
       event.eventName,
       event.screen,
@@ -190,22 +190,44 @@ function UserEventsContent() {
     document.body.removeChild(link);
   };
 
-  const formatDate = (dateString: string | number) => {
-    try {
-      const date = typeof dateString === 'string' ? new Date(dateString) : new Date(dateString * 1000);
-      return date.toLocaleString('ka-GE', {
-        timeZone: 'Asia/Tbilisi',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      });
-    } catch {
-      return dateString.toString();
+  const toDate = (value: string | number | undefined | null): Date | null => {
+    if (value === undefined || value === null) return null;
+
+    if (typeof value === 'number') {
+      const ms = value > 1_000_000_000_000 ? value : value * 1000;
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? null : d;
     }
+
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (/^\d+$/.test(trimmed)) {
+      const asNumber = Number(trimmed);
+      const ms = asNumber > 1_000_000_000_000 ? asNumber : asNumber * 1000;
+      const d = new Date(ms);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    const d = new Date(trimmed);
+    return Number.isNaN(d.getTime()) ? null : d;
   };
+
+  const formatDate = (value: string | number | undefined | null) => {
+    const date = toDate(value);
+    if (!date) return value == null ? '-' : String(value);
+    return date.toLocaleString('ka-GE', {
+      timeZone: 'Asia/Tbilisi',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  const formatEventDate = (event: UserEvent) => formatDate(event.date || event.timestamp);
 
   // Event statistics
   const eventStats = useMemo(() => {
@@ -432,10 +454,10 @@ function UserEventsContent() {
                     </div>
                   </div>
                   
-                  {userData.lastActivityFormatted && (
+                  {(userData.lastActivity || userData.lastActivityFormatted) && (
                     <div className="text-sm text-gray-500 mb-3">
                       <span className="font-medium">ბოლო აქტივობა:</span>{' '}
-                      {userData.lastActivityFormatted}
+                      {formatDate(userData.lastActivity || userData.lastActivityFormatted)}
                     </div>
                   )}
 
@@ -455,7 +477,7 @@ function UserEventsContent() {
                           {userData.events.map((event) => (
                             <tr key={event.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-700">
                               <td className="p-2">
-                                {event.dateFormatted || formatDate(event.date || event.timestamp)}
+                                {formatEventDate(event)}
                               </td>
                               <td className="p-2">
                                 <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
@@ -698,7 +720,7 @@ function UserEventsContent() {
                       <tr key={event.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="p-3">
                           <div className="text-sm text-gray-900 dark:text-white">
-                            {event.dateFormatted || formatDate(event.date || event.timestamp)}
+                            {formatEventDate(event)}
                           </div>
                         </td>
                         <td className="p-3">
