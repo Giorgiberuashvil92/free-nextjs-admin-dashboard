@@ -1,11 +1,12 @@
+import { resolveAdminAuthSecret } from "@/lib/adminAuthSecret";
 import { ADMIN_USER_DISPLAY } from "@/lib/adminUsers";
 import { COOKIE_NAME, verifyAdminSessionToken } from "@/lib/adminSession";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const secret = process.env.ADMIN_AUTH_SECRET?.trim();
-  if (!secret || secret.length < 24) {
+  const secret = resolveAdminAuthSecret();
+  if (!secret) {
     return NextResponse.json({ user: null }, { status: 200 });
   }
 

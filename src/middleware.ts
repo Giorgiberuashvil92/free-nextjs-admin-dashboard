@@ -1,3 +1,4 @@
+import { resolveAdminAuthSecret } from "@/lib/adminAuthSecret";
 import { COOKIE_NAME, verifyAdminSessionToken } from "@/lib/adminSession";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
@@ -30,8 +31,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const secret = process.env.ADMIN_AUTH_SECRET?.trim();
-  if (!secret || secret.length < 24) {
+  const secret = resolveAdminAuthSecret();
+  if (!secret) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json(
         { error: "ადმინის ავტორიზაცია არ არის კონფიგურირებული." },

@@ -1,3 +1,4 @@
+import { adminAuthSecretMinLength, resolveAdminAuthSecret } from "@/lib/adminAuthSecret";
 import {
   ADMIN_USER_DISPLAY,
   adminPasswordEnvKey,
@@ -21,10 +22,13 @@ function safeComparePassword(input: string, expected: string | undefined): boole
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.ADMIN_AUTH_SECRET?.trim();
-  if (!secret || secret.length < 24) {
+  const secret = resolveAdminAuthSecret();
+  if (!secret) {
+    const n = adminAuthSecretMinLength();
     return NextResponse.json(
-      { error: "სერვერზე არ არის კონფიგურირებული ADMIN_AUTH_SECRET (მინ. 24 სიმბოლო)." },
+      {
+        error: `სერვერზე არ არის დაყენებული ADMIN_AUTH_SECRET (მინ. ${n} სიმბოლო). ჰოსტინგზე (Railway, Vercel, …) Environment Variables-ში დაამატე ცვლადი, მაგ.: openssl rand -hex 32 — შემდეგ გადააგენერე deploy.`,
+      },
       { status: 500 },
     );
   }
