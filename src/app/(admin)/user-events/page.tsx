@@ -513,7 +513,6 @@ function UserEventsContent() {
         </div>
       )}
 
-      {/* Single User View */}
       {viewMode === 'user' && userEventsData && (
         <div>
           {/* User Info Section */}

@@ -5,8 +5,11 @@ interface InputProps {
   id?: string;
   name?: string;
   placeholder?: string;
+  /** კონტროლირებადი რეჟიმი — თუ გადაეცემა, `defaultValue` იგნორირდება */
+  value?: string | number;
   defaultValue?: string | number;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  autoComplete?: string;
   className?: string;
   min?: string;
   max?: string;
@@ -22,8 +25,10 @@ const Input: FC<InputProps> = ({
   id,
   name,
   placeholder,
+  value,
   defaultValue,
   onChange,
+  autoComplete,
   className = "",
   min,
   max,
@@ -54,8 +59,10 @@ const Input: FC<InputProps> = ({
         id={id}
         name={name}
         placeholder={placeholder}
-        defaultValue={defaultValue}
-        onChange={onChange}
+        {...(value !== undefined
+          ? { value, onChange }
+          : { defaultValue, onChange })}
+        autoComplete={autoComplete}
         min={min}
         max={max}
         step={step}
