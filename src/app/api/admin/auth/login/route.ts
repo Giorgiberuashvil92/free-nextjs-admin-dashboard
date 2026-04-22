@@ -27,7 +27,8 @@ export async function POST(request: Request) {
     const n = adminAuthSecretMinLength();
     return NextResponse.json(
       {
-        error: `სერვერზე არ არის დაყენებული ADMIN_AUTH_SECRET (მინ. ${n} სიმბოლო). ჰოსტინგზე (Railway, Vercel, …) Environment Variables-ში დაამატე ცვლადი, მაგ.: openssl rand -hex 32 — შემდეგ გადააგენერე deploy.`,
+        code: "ADMIN_AUTH_SECRET_MISSING",
+        error: `სერვერზე არ არის ADMIN_AUTH_SECRET (მინ. ${n} სიმბოლო). დაამატე ჰოსტინგის Environment Variables-ში და გადააგენერე deploy.`,
       },
       { status: 500 },
     );
@@ -51,7 +52,11 @@ export async function POST(request: Request) {
   const expected = process.env[envKey]?.trim();
   if (!expected) {
     return NextResponse.json(
-      { error: `სერვერზე არ არის დაყენებული ${envKey}.` },
+      {
+        code: "ADMIN_PASSWORD_MISSING",
+        envKey,
+        error: `სერვერზე არ არის დაყენებული ${envKey}. დაამატე Railway Variables-ში და გადააგენერე deploy.`,
+      },
       { status: 500 },
     );
   }

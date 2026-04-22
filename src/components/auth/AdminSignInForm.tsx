@@ -29,9 +29,16 @@ export default function AdminSignInForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, password }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
-        setError(data.error ?? "შესვლა ვერ მოხერხდა.");
+        if (misconfigured && data.code === "ADMIN_AUTH_SECRET_MISSING") {
+          setError(null);
+        } else {
+          setError(data.error ?? "შესვლა ვერ მოხერხდა.");
+        }
         return;
       }
       const from = searchParams.get("from");
@@ -59,10 +66,23 @@ export default function AdminSignInForm() {
         </div>
 
         {misconfigured && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
-            სერვერზე დააყენეთ <span className="font-mono">ADMIN_AUTH_SECRET</span> (მინიმუმ 24
-            სიმბოლო) და სამივე პაროლი <span className="font-mono">ADMIN_PASSWORD_*</span>{" "}
-            გარემოს ცვლადებში.
+          <div className="mb-4 space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
+            <p className="font-medium">კონფიგურაცია აკლია (Railway / Vercel)</p>
+            <ol className="list-decimal space-y-1.5 pl-4 text-left">
+              <li>
+                დაამატე <span className="font-mono">ADMIN_AUTH_SECRET</span> — მინ. 24 სიმბოლო
+                (ტერმინალში: <span className="font-mono">openssl rand -hex 32</span>).
+              </li>
+              <li>
+                დაამატე ოთხივე პაროლი:{" "}
+                <span className="font-mono text-xs">
+                  ADMIN_PASSWORD_GIGA, ADMIN_PASSWORD_NABAKHA, ADMIN_PASSWORD_NIKABER,
+                  ADMIN_PASSWORD_GIORGI
+                </span>
+                .
+              </li>
+              <li>შეინახე ცვლადები და გადააგენერე სერვისი (Redeploy).</li>
+            </ol>
           </div>
         )}
 
