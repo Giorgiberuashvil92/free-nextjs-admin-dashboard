@@ -31,14 +31,15 @@ export default function AdminSignInForm() {
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
-        code?: string;
+        message?: string | string[];
       };
       if (!res.ok) {
-        if (misconfigured && data.code === "ADMIN_AUTH_SECRET_MISSING") {
-          setError(null);
-        } else {
-          setError(data.error ?? "შესვლა ვერ მოხერხდა.");
-        }
+        const nestMsg = Array.isArray(data.message)
+          ? data.message[0]
+          : typeof data.message === "string"
+            ? data.message
+            : undefined;
+        setError(data.error ?? nestMsg ?? "შესვლა ვერ მოხერხდა.");
         return;
       }
       const from = searchParams.get("from");
@@ -67,22 +68,18 @@ export default function AdminSignInForm() {
 
         {misconfigured && (
           <div className="mb-4 space-y-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-100">
-            <p className="font-medium">კონფიგურაცია აკლია (Railway / Vercel)</p>
-            <ol className="list-decimal space-y-1.5 pl-4 text-left">
+            <p className="font-medium">სესია ვადაგასულია ან ბექენდმა უარყო</p>
+            <ul className="list-disc space-y-1.5 pl-4 text-left">
+              <li>შედით ხელახლა პაროლით (იუზერები Mongo-შია — იხ. <span className="font-mono">npm run seed:panel-admins</span> ბექენდზე).</li>
               <li>
-                დაამატე <span className="font-mono">ADMIN_AUTH_SECRET</span> — მინ. 24 სიმბოლო
-                (ტერმინალში: <span className="font-mono">openssl rand -hex 32</span>).
+                ბექენდზე Railway-ში დააყენე <span className="font-mono">PANEL_ADMIN_JWT_SECRET</span>{" "}
+                (მინ. 24 სიმბოლო) და გადააგენერე.
               </li>
               <li>
-                დაამატე ოთხივე პაროლი:{" "}
-                <span className="font-mono text-xs">
-                  ADMIN_PASSWORD_GIGA, ADMIN_PASSWORD_NABAKHA, ADMIN_PASSWORD_NIKABER,
-                  ADMIN_PASSWORD_GIORGI
-                </span>
-                .
+                Next ადმინზე დააყენე <span className="font-mono">NEXT_PUBLIC_BACKEND_URL</span> სწორი
+                ბექენდის URL-ით.
               </li>
-              <li>შეინახე ცვლადები და გადააგენერე სერვისი (Redeploy).</li>
-            </ol>
+            </ul>
           </div>
         )}
 

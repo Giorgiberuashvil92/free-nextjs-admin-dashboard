@@ -1,10 +1,15 @@
-import { NextResponse } from "next/server";
+import { requirePanelSession } from "@/lib/requirePanelSession";
 import { getMarteBackendBaseUrl, getSupportChatAgentKey } from "@/lib/supportChatMarte";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Promise<{ userId: string }> },
 ) {
+  const denied = await requirePanelSession(request);
+  if (denied) return denied;
+
   try {
     const { userId } = await params;
     if (!userId) {

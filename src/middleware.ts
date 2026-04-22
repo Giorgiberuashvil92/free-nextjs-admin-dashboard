@@ -1,5 +1,5 @@
-import { resolveAdminAuthSecret } from "@/lib/adminAuthSecret";
-import { COOKIE_NAME, verifyAdminSessionToken } from "@/lib/adminSession";
+import { PANEL_AUTH_COOKIE } from "@/lib/panelAuthConfig";
+import { verifyPanelSessionWithBackend } from "@/lib/verifyPanelSession";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -31,24 +31,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const secret = resolveAdminAuthSecret();
-  if (!secret) {
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json(
-        { error: "ადმინის ავტორიზაცია არ არის კონფიგურირებული." },
-        { status: 503 },
-      );
-    }
-    const url = request.nextUrl.clone();
-    url.pathname = "/admin/signin";
-    url.searchParams.set("misconfigured", "1");
-    return NextResponse.redirect(url);
-  }
+  const token = request.cookies.get(PANEL_AUTH_COOKIE)?.value;
+  const ok = await verifyPanelSessionWithBackend(token);
 
-  const token = request.cookies.get(COOKIE_NAME)?.value;
-  const userId = token ? await verifyAdminSessionToken(token, secret) : null;
-
-  if (userId) {
+  if (ok) {
     if (pathname === "/admin/signin") {
       const from = request.nextUrl.searchParams.get("from");
       if (from && from.startsWith("/") && !from.startsWith("//")) {
@@ -68,6 +54,9 @@ export async function middleware(request: NextRequest) {
   const from = `${pathname}${request.nextUrl.search}`;
   if (from && from !== "/admin/signin") {
     url.searchParams.set("from", from);
+  }
+  if (token) {
+    url.searchParams.set("misconfigured", "1");
   }
   return NextResponse.redirect(url);
 }

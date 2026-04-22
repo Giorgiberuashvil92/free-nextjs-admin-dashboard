@@ -1,9 +1,9 @@
-import { COOKIE_NAME } from "@/lib/adminSession";
+import { PANEL_AUTH_COOKIE } from "@/lib/panelAuthConfig";
 import { NextResponse } from "next/server";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(COOKIE_NAME, "", {
+  res.cookies.set(PANEL_AUTH_COOKIE, "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

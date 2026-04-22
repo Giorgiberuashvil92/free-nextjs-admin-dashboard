@@ -1,10 +1,14 @@
+import { requirePanelSession } from '@/lib/requirePanelSession';
 import { NextRequest, NextResponse } from 'next/server';
 import https from 'https';
 import querystring from 'querystring';
 
 const SMS_API_KEY = process.env.SMS_API_KEY || '65fa7f724d09ed5357688a00a643f657';
 
-export async function GET(): Promise<NextResponse> {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const denied = await requirePanelSession(request);
+  if (denied) return denied;
+
   return new Promise<NextResponse>((resolve) => {
     const data = querystring.stringify({ apikey: SMS_API_KEY });
 

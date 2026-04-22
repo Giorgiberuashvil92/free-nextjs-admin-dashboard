@@ -1,39 +1,8 @@
-import { adminAuthSecretMinLength, resolveAdminAuthSecret } from "@/lib/adminAuthSecret";
-import {
-  ADMIN_USER_DISPLAY,
-  adminPasswordEnvKey,
-  isAdminUserId,
-  type AdminUserId,
-} from "@/lib/adminUsers";
-import { COOKIE_NAME, createAdminSessionToken } from "@/lib/adminSession";
-import { timingSafeEqual } from "crypto";
+import { ADMIN_USER_DISPLAY, isAdminUserId, type AdminUserId } from "@/lib/adminUsers";
+import { getPanelBackendBaseUrl, PANEL_AUTH_COOKIE } from "@/lib/panelAuthConfig";
 import { NextResponse } from "next/server";
 
-function safeComparePassword(input: string, expected: string | undefined): boolean {
-  if (!expected) return false;
-  try {
-    const a = Buffer.from(input, "utf8");
-    const b = Buffer.from(expected, "utf8");
-    if (a.length !== b.length) return false;
-    return timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
-
 export async function POST(request: Request) {
-  const secret = resolveAdminAuthSecret();
-  if (!secret) {
-    const n = adminAuthSecretMinLength();
-    return NextResponse.json(
-      {
-        code: "ADMIN_AUTH_SECRET_MISSING",
-        error: `სერვერზე არ არის ADMIN_AUTH_SECRET (მინ. ${n} სიმბოლო). დაამატე ჰოსტინგის Environment Variables-ში და გადააგენერე deploy.`,
-      },
-      { status: 500 },
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -41,36 +10,67 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "არასწორი JSON." }, { status: 400 });
   }
 
-  const userId = (body as { userId?: string })?.userId?.trim();
+  const usernameRaw = (body as { username?: string; userId?: string })?.username?.trim()
+    ?? (body as { userId?: string })?.userId?.trim()
+    ?? "";
   const password = (body as { password?: string })?.password ?? "";
 
-  if (!userId || !isAdminUserId(userId)) {
+  if (!usernameRaw || !isAdminUserId(usernameRaw)) {
     return NextResponse.json({ error: "არასწორი მომხმარებელი." }, { status: 400 });
   }
 
-  const envKey = adminPasswordEnvKey(userId as AdminUserId);
-  const expected = process.env[envKey]?.trim();
-  if (!expected) {
+  const base = getPanelBackendBaseUrl();
+  let upstream: Response;
+  try {
+    upstream = await fetch(`${base}/panel-admin/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: usernameRaw, password }),
+      cache: "no-store",
+    });
+  } catch {
     return NextResponse.json(
-      {
-        code: "ADMIN_PASSWORD_MISSING",
-        envKey,
-        error: `სერვერზე არ არის დაყენებული ${envKey}. დაამატე Railway Variables-ში და გადააგენერე deploy.`,
-      },
-      { status: 500 },
+      { error: "ბექენდთან კავშირი ვერ მოხერხდა. შეამოწმე NEXT_PUBLIC_BACKEND_URL." },
+      { status: 502 },
     );
   }
 
-  if (!safeComparePassword(password, expected)) {
-    return NextResponse.json({ error: "არასწორი პაროლი." }, { status: 401 });
+  const data = (await upstream.json().catch(() => ({}))) as {
+    message?: string | string[];
+    access_token?: string;
+    user?: { username?: string; displayName?: string };
+  };
+
+  if (!upstream.ok) {
+    const nestMsg = Array.isArray(data.message)
+      ? data.message[0]
+      : typeof data.message === "string"
+        ? data.message
+        : undefined;
+    return NextResponse.json(
+      {
+        code: upstream.status === 401 ? "INVALID_CREDENTIALS" : "LOGIN_FAILED",
+        error: nestMsg ?? "შესვლა ვერ მოხერხდა.",
+      },
+      { status: upstream.status >= 400 && upstream.status < 600 ? upstream.status : 500 },
+    );
   }
 
-  const token = await createAdminSessionToken(userId as AdminUserId, secret);
+  const token = data.access_token;
+  if (!token) {
+    return NextResponse.json({ error: "ბექენდმა ტოკენი არ დააბრუნა." }, { status: 502 });
+  }
+
+  const uid = usernameRaw as AdminUserId;
   const res = NextResponse.json({
     ok: true,
-    user: { id: userId, displayName: ADMIN_USER_DISPLAY[userId as AdminUserId] },
+    user: {
+      id: uid,
+      displayName: data.user?.displayName ?? ADMIN_USER_DISPLAY[uid],
+    },
   });
-  res.cookies.set(COOKIE_NAME, token, {
+
+  res.cookies.set(PANEL_AUTH_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

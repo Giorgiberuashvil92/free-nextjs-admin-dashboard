@@ -1,3 +1,5 @@
+import { PANEL_AUTH_COOKIE } from '@/lib/panelAuthConfig';
+import { verifyPanelSessionWithBackend } from '@/lib/verifyPanelSession';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Get backend URL based on environment
@@ -66,6 +68,12 @@ async function handleRequest(
   method: string
 ) {
   try {
+    const panelToken = request.cookies.get(PANEL_AUTH_COOKIE)?.value;
+    const sessionOk = await verifyPanelSessionWithBackend(panelToken);
+    if (!sessionOk) {
+      return NextResponse.json({ error: 'ავტორიზაცია საჭიროა.' }, { status: 401 });
+    }
+
     const path = params.path.join('/');
     const url = new URL(request.url);
     const searchParams = url.searchParams.toString();

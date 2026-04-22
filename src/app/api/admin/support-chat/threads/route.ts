@@ -1,7 +1,12 @@
-import { NextResponse } from "next/server";
+import { requirePanelSession } from "@/lib/requirePanelSession";
 import { getMarteBackendBaseUrl, getSupportChatAgentKey } from "@/lib/supportChatMarte";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = await requirePanelSession(request);
+  if (denied) return denied;
+
   try {
     const key = getSupportChatAgentKey();
     const res = await fetch(

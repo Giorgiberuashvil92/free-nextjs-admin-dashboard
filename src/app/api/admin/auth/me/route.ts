@@ -1,27 +1,43 @@
-import { resolveAdminAuthSecret } from "@/lib/adminAuthSecret";
-import { ADMIN_USER_DISPLAY } from "@/lib/adminUsers";
-import { COOKIE_NAME, verifyAdminSessionToken } from "@/lib/adminSession";
+import { ADMIN_USER_DISPLAY, isAdminUserId, type AdminUserId } from "@/lib/adminUsers";
+import { getPanelBackendBaseUrl, PANEL_AUTH_COOKIE } from "@/lib/panelAuthConfig";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const secret = resolveAdminAuthSecret();
-  if (!secret) {
-    return NextResponse.json({ user: null }, { status: 200 });
-  }
-
   const cookieStore = await cookies();
-  const token = cookieStore.get(COOKIE_NAME)?.value;
+  const token = cookieStore.get(PANEL_AUTH_COOKIE)?.value;
   if (!token) {
     return NextResponse.json({ user: null }, { status: 200 });
   }
 
-  const userId = await verifyAdminSessionToken(token, secret);
-  if (!userId) {
+  const base = getPanelBackendBaseUrl();
+  let res: Response;
+  try {
+    res = await fetch(`${base}/panel-admin/session`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+  } catch {
     return NextResponse.json({ user: null }, { status: 200 });
   }
 
+  if (!res.ok) {
+    return NextResponse.json({ user: null }, { status: 200 });
+  }
+
+  const data = (await res.json().catch(() => ({}))) as {
+    user?: { username?: string; displayName?: string };
+  };
+  const u = data.user?.username?.trim();
+  if (!u || !isAdminUserId(u)) {
+    return NextResponse.json({ user: null }, { status: 200 });
+  }
+  const id = u as AdminUserId;
   return NextResponse.json({
-    user: { id: userId, displayName: ADMIN_USER_DISPLAY[userId] },
+    user: {
+      id,
+      displayName: data.user?.displayName ?? ADMIN_USER_DISPLAY[id],
+    },
   });
 }

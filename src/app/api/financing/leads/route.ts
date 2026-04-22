@@ -1,8 +1,12 @@
+import { requirePanelSession } from '@/lib/requirePanelSession';
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = 'https://marte-backend-production.up.railway.app';
 
 export async function GET(request: NextRequest) {
+  const denied = await requirePanelSession(request);
+  if (denied) return denied;
+
   try {
     const url = new URL(request.url);
     const searchParams = url.searchParams.toString();
