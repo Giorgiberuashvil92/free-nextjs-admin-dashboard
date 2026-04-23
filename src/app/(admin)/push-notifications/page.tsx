@@ -48,7 +48,9 @@ type NotificationType =
   | 'parts_request'
   | 'fuel_discount'
   | 'ai_recommendation'
-  | 'offer_status';
+  | 'offer_status'
+  | 'radar'
+  | 'radar_alert';
 
 type UserStats = { total: number; active: number; byRole: Record<string, number> };
 type User = { id: string; phone: string; firstName?: string; lastName?: string; email?: string; role?: string; isActive?: boolean; avatar?: string; profileImage?: string };
@@ -123,6 +125,20 @@ const NOTIFICATION_TYPES: NotificationTypeConfig[] = [
   },
   { type: 'ai_recommendation', label: 'AI Recommendation', screen: 'AIRecommendations', icon: '🤖', description: 'გადავა All Requests სქრინზე' },
   { type: 'offer_status', label: 'Offer Status', screen: 'OfferDetails', icon: '📊', description: 'გადავა Offers სქრინზე' },
+  {
+    type: 'radar',
+    label: 'რადარები',
+    screen: 'radars',
+    icon: '📡',
+    description: 'აპში გადავა რადარების გვერდზე (/radars)',
+  },
+  {
+    type: 'radar_alert',
+    label: 'რადარის გაფრთხილება',
+    screen: 'radars',
+    icon: '🚨',
+    description: 'რადარის alert — აპში გადავა /radars გვერდზე',
+  },
 ];
 
 const formatDate = (d?: string) =>

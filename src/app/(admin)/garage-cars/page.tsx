@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiGetJson } from '@/lib/api';
 
 interface Reminder {
@@ -71,6 +71,7 @@ export default function GarageCarsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedCar, setExpandedCar] = useState<string | null>(null);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const load = useCallback(async () => {
@@ -121,6 +122,231 @@ export default function GarageCarsPage() {
 
   const toggleExpand = (carId: string) => {
     setExpandedCar(expandedCar === carId ? null : carId);
+  };
+
+  const analytics = useMemo(() => {
+    const uniqueUsers = new Set(
+      cars.map((car) => car.user?.id).filter(Boolean) as string[],
+    );
+    const carsWithUser = cars.filter((car) => !!car.user);
+    const activeCars = cars.filter((car) => car.isActive).length;
+    const inactiveCars = cars.length - activeCars;
+    const carsWithoutUser = cars.length - carsWithUser.length;
+
+    const totalFuelSpent = cars.reduce(
+      (sum, car) => sum + (car.fuelEntries?.stats.totalSpent || 0),
+      0,
+    );
+    const totalFuelLiters = cars.reduce(
+      (sum, car) => sum + (car.fuelEntries?.stats.totalLiters || 0),
+      0,
+    );
+    const totalFuelEntries = cars.reduce(
+      (sum, car) => sum + (car.fuelEntries?.stats.totalEntries || 0),
+      0,
+    );
+    const avgFuelPrice =
+      totalFuelLiters > 0 ? totalFuelSpent / totalFuelLiters : 0;
+
+    const totalReminders = cars.reduce(
+      (sum, car) => sum + (car.reminders?.stats.total || 0),
+      0,
+    );
+    const completedReminders = cars.reduce(
+      (sum, car) => sum + (car.reminders?.stats.completed || 0),
+      0,
+    );
+    const pendingReminders = cars.reduce(
+      (sum, car) => sum + (car.reminders?.stats.pending || 0),
+      0,
+    );
+    const urgentReminders = cars.reduce(
+      (sum, car) => sum + (car.reminders?.stats.urgent || 0),
+      0,
+    );
+    const reminderCompletionRate =
+      totalReminders > 0 ? (completedReminders / totalReminders) * 100 : 0;
+
+    const avgMileage =
+      cars.filter((car) => typeof car.mileage === 'number').reduce((sum, car) => sum + (car.mileage || 0), 0) /
+      Math.max(
+        1,
+        cars.filter((car) => typeof car.mileage === 'number').length,
+      );
+
+    const makeCounts = cars.reduce<Record<string, number>>((acc, car) => {
+      const key = (car.make || 'უცნობი').trim() || 'უცნობი';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const topMakes = Object.entries(makeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6);
+
+    const userStatsMap = cars.reduce<
+      Record<
+        string,
+        {
+          userId: string;
+          name: string;
+          phone: string;
+          cars: number;
+          reminders: number;
+          urgentReminders: number;
+          fuelSpent: number;
+        }
+      >
+    >((acc, car) => {
+      if (!car.user?.id) return acc;
+      const id = car.user.id;
+      const name =
+        `${car.user.firstName || ''} ${car.user.lastName || ''}`.trim() ||
+        'უცნობი იუზერი';
+      if (!acc[id]) {
+        acc[id] = {
+          userId: id,
+          name,
+          phone: car.user.phone || '—',
+          cars: 0,
+          reminders: 0,
+          urgentReminders: 0,
+          fuelSpent: 0,
+        };
+      }
+      acc[id].cars += 1;
+      acc[id].reminders += car.reminders?.stats.total || 0;
+      acc[id].urgentReminders += car.reminders?.stats.urgent || 0;
+      acc[id].fuelSpent += car.fuelEntries?.stats.totalSpent || 0;
+      return acc;
+    }, {});
+
+    const topUsers = Object.values(userStatsMap)
+      .sort((a, b) => b.cars - a.cars || b.fuelSpent - a.fuelSpent)
+      .slice(0, 10);
+
+    return {
+      uniqueUsers: uniqueUsers.size,
+      carsWithUser: carsWithUser.length,
+      carsWithoutUser,
+      activeCars,
+      inactiveCars,
+      totalFuelSpent,
+      totalFuelLiters,
+      totalFuelEntries,
+      avgFuelPrice,
+      totalReminders,
+      completedReminders,
+      pendingReminders,
+      urgentReminders,
+      reminderCompletionRate,
+      avgMileage,
+      topMakes,
+      topUsers,
+    };
+  }, [cars]);
+
+  const usersDetailed = useMemo(() => {
+    const map = filteredCars.reduce<
+      Record<
+        string,
+        {
+          userId: string;
+          name: string;
+          phone: string;
+          email: string;
+          cars: Car[];
+          reminders: Array<
+            Reminder & { carId: string; carLabel: string; plateNumber: string }
+          >;
+          fuelEntries: Array<
+            FuelEntry & { carId: string; carLabel: string; plateNumber: string }
+          >;
+        }
+      >
+    >((acc, car) => {
+      const userId = car.user?.id || car.userId || '';
+      if (!userId) return acc;
+      const name =
+        `${car.user?.firstName || ''} ${car.user?.lastName || ''}`.trim() ||
+        'უცნობი იუზერი';
+
+      if (!acc[userId]) {
+        acc[userId] = {
+          userId,
+          name,
+          phone: car.user?.phone || '—',
+          email: car.user?.email || '—',
+          cars: [],
+          reminders: [],
+          fuelEntries: [],
+        };
+      }
+
+      acc[userId].cars.push(car);
+
+      const carLabel = `${car.make || '—'} ${car.model || ''}`.trim();
+      const plateNumber = car.plateNumber || '—';
+      (car.reminders?.list || []).forEach((r) => {
+        acc[userId].reminders.push({
+          ...r,
+          carId: car.id,
+          carLabel,
+          plateNumber,
+        });
+      });
+      (car.fuelEntries?.list || []).forEach((f) => {
+        acc[userId].fuelEntries.push({
+          ...f,
+          carId: car.id,
+          carLabel,
+          plateNumber,
+        });
+      });
+
+      return acc;
+    }, {});
+
+    return Object.values(map)
+      .map((u) => {
+        const urgentReminders = u.reminders.filter((r) => r.isUrgent).length;
+        const pendingReminders = u.reminders.filter((r) => !r.isCompleted).length;
+        const completedReminders = u.reminders.filter((r) => r.isCompleted).length;
+        const totalFuelSpent = u.fuelEntries.reduce(
+          (sum, f) => sum + (f.totalPrice || 0),
+          0,
+        );
+        const totalFuelLiters = u.fuelEntries.reduce(
+          (sum, f) => sum + (f.liters || 0),
+          0,
+        );
+        const lastFuelDate =
+          u.fuelEntries.length > 0
+            ? [...u.fuelEntries].sort(
+                (a, b) =>
+                  new Date(b.date).getTime() - new Date(a.date).getTime(),
+              )[0]?.date
+            : null;
+
+        return {
+          ...u,
+          urgentReminders,
+          pendingReminders,
+          completedReminders,
+          totalFuelSpent,
+          totalFuelLiters,
+          lastFuelDate,
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.cars.length - a.cars.length ||
+          b.totalFuelSpent - a.totalFuelSpent ||
+          b.reminders.length - a.reminders.length,
+      );
+  }, [filteredCars]);
+
+  const toggleUserExpand = (userId: string) => {
+    setExpandedUser((prev) => (prev === userId ? null : userId));
   };
 
   if (loading) {
@@ -184,6 +410,151 @@ export default function GarageCarsPage() {
         </div>
       </div>
 
+      {/* ანალიტიკა */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-sm text-gray-500 mb-1">იუზერის დაფარვა</div>
+          <div className="text-2xl font-bold">{analytics.uniqueUsers}</div>
+          <div className="text-xs text-gray-600 mt-2">
+            იუზერით: {analytics.carsWithUser} | გარეშე: {analytics.carsWithoutUser}
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-sm text-gray-500 mb-1">სტატუსები</div>
+          <div className="text-2xl font-bold">{analytics.activeCars}</div>
+          <div className="text-xs text-gray-600 mt-2">
+            აქტიური | არააქტიური: {analytics.inactiveCars}
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="text-sm text-gray-500 mb-1">საშ. გარბენი</div>
+          <div className="text-2xl font-bold">
+            {Number.isFinite(analytics.avgMileage)
+              ? analytics.avgMileage.toLocaleString(undefined, {
+                  maximumFractionDigits: 0,
+                })
+              : 0}{' '}
+            კმ
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <h3 className="font-semibold mb-3">⛽ Fuel ანალიზი</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">სულ დახარჯული</div>
+              <div className="font-bold text-lg">
+                {analytics.totalFuelSpent.toFixed(2)} ₾
+              </div>
+            </div>
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">სულ ლიტრები</div>
+              <div className="font-bold text-lg">
+                {analytics.totalFuelLiters.toFixed(1)} ლ
+              </div>
+            </div>
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">ჩანაწერები</div>
+              <div className="font-bold text-lg">{analytics.totalFuelEntries}</div>
+            </div>
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">საშ. ფასი / ლიტრი</div>
+              <div className="font-bold text-lg">
+                {analytics.avgFuelPrice.toFixed(2)} ₾
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <h3 className="font-semibold mb-3">🔔 Reminder ანალიზი</h3>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">სულ შეხსენება</div>
+              <div className="font-bold text-lg">{analytics.totalReminders}</div>
+            </div>
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">დასრულებული</div>
+              <div className="font-bold text-lg">{analytics.completedReminders}</div>
+            </div>
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">მომლოდინი</div>
+              <div className="font-bold text-lg">{analytics.pendingReminders}</div>
+            </div>
+            <div className="bg-gray-50 border rounded p-3">
+              <div className="text-gray-500">გადაუდებელი</div>
+              <div className="font-bold text-lg text-red-600">
+                {analytics.urgentReminders}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 text-sm text-gray-600">
+            შესრულების მაჩვენებელი:{' '}
+            <span className="font-semibold">
+              {analytics.reminderCompletionRate.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <h3 className="font-semibold mb-3">🏷️ Top ბრენდები</h3>
+          {analytics.topMakes.length === 0 ? (
+            <div className="text-sm text-gray-500">მონაცემი არ არის</div>
+          ) : (
+            <div className="space-y-2">
+              {analytics.topMakes.map(([make, count]) => (
+                <div
+                  key={make}
+                  className="flex items-center justify-between text-sm border-b pb-2 last:border-b-0"
+                >
+                  <span className="font-medium">{make}</span>
+                  <span className="text-gray-600">{count} მანქანა</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <h3 className="font-semibold mb-3">👤 Top იუზერები (ანალიზისთვის)</h3>
+          {analytics.topUsers.length === 0 ? (
+            <div className="text-sm text-gray-500">მონაცემი არ არის</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-2 py-2">იუზერი</th>
+                    <th className="text-left px-2 py-2">მანქანები</th>
+                    <th className="text-left px-2 py-2">შეხსენ.</th>
+                    <th className="text-left px-2 py-2">გადაუდ.</th>
+                    <th className="text-left px-2 py-2">Fuel ₾</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analytics.topUsers.map((u) => (
+                    <tr key={u.userId} className="border-t">
+                      <td className="px-2 py-2">
+                        <div className="font-medium">{u.name}</div>
+                        <div className="text-xs text-gray-500">{u.phone}</div>
+                      </td>
+                      <td className="px-2 py-2">{u.cars}</td>
+                      <td className="px-2 py-2">{u.reminders}</td>
+                      <td className="px-2 py-2 text-red-600">{u.urgentReminders}</td>
+                      <td className="px-2 py-2">{u.fuelSpent.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* ძიება */}
       <div className="mb-4">
         <input
@@ -193,6 +564,226 @@ export default function GarageCarsPage() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+      </div>
+
+      {/* იუზერების დეტალური ხედვა */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-3">👤 იუზერების დეტალური ანალიზი</h2>
+        {usersDetailed.length === 0 ? (
+          <div className="bg-white rounded-lg border p-4 text-sm text-gray-500">
+            იუზერები ვერ მოიძებნა
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {usersDetailed.map((u) => (
+              <div key={u.userId} className="bg-white border rounded-lg shadow-sm">
+                <div className="p-4 border-b border-gray-100">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-lg font-semibold">{u.name}</div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        ტელ: {u.phone}
+                        {u.email !== '—' ? ` | ${u.email}` : ''}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => toggleUserExpand(u.userId)}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors text-sm"
+                    >
+                      {expandedUser === u.userId ? 'დეტალების დამალვა' : 'ყველა დეტალის ნახვა'}
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
+                    <div className="bg-gray-50 border rounded p-2">
+                      <div className="text-gray-500">მანქანები</div>
+                      <div className="font-bold">{u.cars.length}</div>
+                    </div>
+                    <div className="bg-gray-50 border rounded p-2">
+                      <div className="text-gray-500">Reminders</div>
+                      <div className="font-bold">{u.reminders.length}</div>
+                    </div>
+                    <div className="bg-gray-50 border rounded p-2">
+                      <div className="text-gray-500">მომლოდინი</div>
+                      <div className="font-bold">{u.pendingReminders}</div>
+                    </div>
+                    <div className="bg-gray-50 border rounded p-2">
+                      <div className="text-gray-500">გადაუდებელი</div>
+                      <div className="font-bold text-red-600">{u.urgentReminders}</div>
+                    </div>
+                    <div className="bg-gray-50 border rounded p-2">
+                      <div className="text-gray-500">Fuel ლიტრი</div>
+                      <div className="font-bold">{u.totalFuelLiters.toFixed(1)} ლ</div>
+                    </div>
+                    <div className="bg-gray-50 border rounded p-2">
+                      <div className="text-gray-500">Fuel ხარჯი</div>
+                      <div className="font-bold">{u.totalFuelSpent.toFixed(2)} ₾</div>
+                    </div>
+                  </div>
+                </div>
+
+                {expandedUser === u.userId && (
+                  <div className="p-4 bg-gray-50 space-y-6">
+                    <div>
+                      <h3 className="font-semibold mb-2">მანქანები ({u.cars.length})</h3>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm bg-white border rounded">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="px-3 py-2 text-left border-b">მანქანა</th>
+                              <th className="px-3 py-2 text-left border-b">ნომერი</th>
+                              <th className="px-3 py-2 text-left border-b">წელი</th>
+                              <th className="px-3 py-2 text-left border-b">გარბენი</th>
+                              <th className="px-3 py-2 text-left border-b">სტატუსი</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {u.cars.map((car) => (
+                              <tr key={car.id} className="border-b">
+                                <td className="px-3 py-2">
+                                  {car.make || '—'} {car.model || ''}
+                                </td>
+                                <td className="px-3 py-2">{car.plateNumber || '—'}</td>
+                                <td className="px-3 py-2">{car.year || '—'}</td>
+                                <td className="px-3 py-2">
+                                  {car.mileage ? `${car.mileage.toLocaleString()} კმ` : '—'}
+                                </td>
+                                <td className="px-3 py-2">
+                                  <span
+                                    className={`text-xs px-2 py-1 rounded ${
+                                      car.isActive
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-gray-100 text-gray-700'
+                                    }`}
+                                  >
+                                    {car.isActive ? 'აქტიური' : 'არააქტიური'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold mb-2">
+                        ყველა reminder ({u.reminders.length})
+                      </h3>
+                      {u.reminders.length === 0 ? (
+                        <div className="text-sm text-gray-500">Reminder-ები არ არის</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm bg-white border rounded">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left border-b">სათაური</th>
+                                <th className="px-3 py-2 text-left border-b">მანქანა</th>
+                                <th className="px-3 py-2 text-left border-b">ნომერი</th>
+                                <th className="px-3 py-2 text-left border-b">თარიღი</th>
+                                <th className="px-3 py-2 text-left border-b">სტატუსი</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[...u.reminders]
+                                .sort(
+                                  (a, b) =>
+                                    new Date(b.reminderDate).getTime() -
+                                    new Date(a.reminderDate).getTime(),
+                                )
+                                .map((r) => (
+                                  <tr key={r.id} className="border-b">
+                                    <td className="px-3 py-2">{r.title}</td>
+                                    <td className="px-3 py-2">{r.carLabel}</td>
+                                    <td className="px-3 py-2">{r.plateNumber}</td>
+                                    <td className="px-3 py-2">
+                                      {new Date(r.reminderDate).toLocaleDateString('ka-GE')}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span
+                                          className={`text-xs px-2 py-1 rounded ${
+                                            r.isCompleted
+                                              ? 'bg-green-100 text-green-700'
+                                              : 'bg-yellow-100 text-yellow-700'
+                                          }`}
+                                        >
+                                          {r.isCompleted ? 'დასრულებული' : 'მომლოდინი'}
+                                        </span>
+                                        {r.isUrgent && (
+                                          <span className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">
+                                            გადაუდებელი
+                                          </span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <h3 className="font-semibold mb-2">
+                        ყველა fuel ჩანაწერი ({u.fuelEntries.length})
+                      </h3>
+                      {u.fuelEntries.length === 0 ? (
+                        <div className="text-sm text-gray-500">
+                          Fuel ჩანაწერები არ არის
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm bg-white border rounded">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left border-b">თარიღი</th>
+                                <th className="px-3 py-2 text-left border-b">მანქანა</th>
+                                <th className="px-3 py-2 text-left border-b">ნომერი</th>
+                                <th className="px-3 py-2 text-left border-b">ლიტრი</th>
+                                <th className="px-3 py-2 text-left border-b">ფასი/ლ</th>
+                                <th className="px-3 py-2 text-left border-b">სულ</th>
+                                <th className="px-3 py-2 text-left border-b">გარბენი</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[...u.fuelEntries]
+                                .sort(
+                                  (a, b) =>
+                                    new Date(b.date).getTime() -
+                                    new Date(a.date).getTime(),
+                                )
+                                .map((f) => (
+                                  <tr key={f.id} className="border-b">
+                                    <td className="px-3 py-2">
+                                      {new Date(f.date).toLocaleDateString('ka-GE')}
+                                    </td>
+                                    <td className="px-3 py-2">{f.carLabel}</td>
+                                    <td className="px-3 py-2">{f.plateNumber}</td>
+                                    <td className="px-3 py-2">{f.liters} ლ</td>
+                                    <td className="px-3 py-2">
+                                      {f.pricePerLiter.toFixed(2)} ₾
+                                    </td>
+                                    <td className="px-3 py-2 font-medium">
+                                      {f.totalPrice.toFixed(2)} ₾
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      {f.mileage.toLocaleString()} კმ
+                                    </td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* მანქანების სია */}

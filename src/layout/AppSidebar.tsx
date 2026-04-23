@@ -168,6 +168,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PieChartIcon />,
+    name: "ოფერების მართვა",
+    path: "/offers-admin",
+  },
+  {
+    icon: <PieChartIcon />,
     name: "დაფინანსების მოთხოვნები",
     path: "/financing-leads",
   },
