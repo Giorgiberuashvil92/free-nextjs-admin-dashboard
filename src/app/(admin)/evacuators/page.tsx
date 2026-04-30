@@ -144,8 +144,8 @@ export default function EvacuatorsAdminPage() {
       if (editingId) {
         await apiPatch(`/services/${editingId}`, payload);
       } else {
-        // ვცდით /services endpoint-ს create-ის გარეშე
-        await apiPost("/services", payload);
+        // create endpoint ამ პროექტში
+        await apiPost("/services/create", payload);
       }
       // reset and reload
       setForm({

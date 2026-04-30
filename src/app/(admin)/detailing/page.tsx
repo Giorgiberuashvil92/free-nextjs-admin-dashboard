@@ -28,6 +28,7 @@ type Store = {
   likesCount?: number;
   viewsCount?: number;
   callsCount?: number;
+  isVip?: boolean;
   isFeatured?: boolean;
 };
 
@@ -245,7 +246,11 @@ export default function DetailingListPage() {
     setVipUpdatingId(store.id);
     setErr("");
     try {
-      await apiPatch(`/detailing/${store.id}`, { isFeatured: !store.isFeatured });
+      const nextVipValue = !(store.isVip === true || store.isFeatured === true);
+      await apiPatch(`/detailing/${store.id}`, {
+        isVip: nextVipValue,
+        isFeatured: nextVipValue,
+      });
       await load();
     } catch (error) {
       console.error("Error toggling VIP:", error);
@@ -325,7 +330,7 @@ export default function DetailingListPage() {
                   )}
                   {/* Status Badge */}
                   <div className="absolute top-2 right-2">
-                    {s.isFeatured && (
+                    {(s.isVip === true || s.isFeatured === true) && (
                       <span className="bg-amber-500 text-white text-xs px-2 py-1 rounded font-medium mr-1">
                         VIP
                       </span>
@@ -415,14 +420,14 @@ export default function DetailingListPage() {
                       onClick={(e) => handleVipToggle(s, e)}
                       disabled={vipUpdatingId === s.id}
                       className={`flex-1 px-3 py-1.5 text-xs rounded text-center ${
-                        s.isFeatured
+                        (s.isVip === true || s.isFeatured === true)
                           ? "bg-amber-100 hover:bg-amber-200 text-amber-800"
                           : "bg-amber-600 hover:bg-amber-700 text-white"
                       } disabled:opacity-60`}
                     >
                       {vipUpdatingId === s.id
                         ? "იტვირთება..."
-                        : s.isFeatured
+                        : (s.isVip === true || s.isFeatured === true)
                           ? "VIP-ის მოხსნა"
                           : "VIP-ზე აყვანა"}
                     </button>
