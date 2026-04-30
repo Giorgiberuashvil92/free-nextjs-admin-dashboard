@@ -1,7 +1,23 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiGet } from '@/lib/api';
+
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'https://marte-backend-production.up.railway.app';
+
+function getClientApiBase(): string {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return '/api/proxy';
+  }
+  return BACKEND_URL;
+}
+
+interface SubscriptionRow {
+  userId: string;
+  status: string;
+}
 
 interface ActiveVehicleSA {
   id: number;
@@ -49,24 +65,73 @@ interface AdminDashboardResponse {
   saRegistrations: SaRegistrationWithOwner[];
 }
 
+/** პრემიუმად ჩავთვლით აქტიურ საბსქრიფშენს (იგივე ლოგიკა რაც საბსქრიფშენების გვერდზე) */
+function isPremiumSubscriptionStatus(status: string): boolean {
+  const s = (status || '').toLowerCase().trim();
+  return s === 'active' || s === 'trial' || s === 'trialing';
+}
+
 export default function FinesVehiclesPage() {
   const [vehicles, setVehicles] = useState<RegisteredVehicleWithOwner[]>([]);
   const [activeSA, setActiveSA] = useState<ActiveVehicleSA[]>([]);
   const [saRegistrations, setSaRegistrations] = useState<SaRegistrationWithOwner[]>([]);
+  const [subscriptions, setSubscriptions] = useState<SubscriptionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  /** ნაგულისხმევად: მხოლოდ არა-პრემიუმი + ჯარიმების მონიტორინგი ჩართული (isActive) */
+  const [showNonPremiumMonitoredOnly, setShowNonPremiumMonitoredOnly] =
+    useState(true);
+
+  const premiumUserIds = useMemo(() => {
+    return new Set(
+      subscriptions
+        .filter((sub) => isPremiumSubscriptionStatus(sub.status))
+        .map((sub) => sub.userId)
+        .filter(Boolean),
+    );
+  }, [subscriptions]);
+
+  const nonPremiumMonitoredStats = useMemo(() => {
+    const list = vehicles.filter(
+      (v) => v.isActive && !premiumUserIds.has(v.userId),
+    );
+    const userIds = new Set(list.map((v) => v.userId).filter(Boolean));
+    return { vehicles: list.length, users: userIds.size };
+  }, [vehicles, premiumUserIds]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const data = await apiGet<AdminDashboardResponse>(
-        '/fines/vehicles/admin-dashboard',
-      );
+      const base = getClientApiBase();
+      const [data, subRes] = await Promise.all([
+        apiGet<AdminDashboardResponse>('/fines/vehicles/admin-dashboard'),
+        fetch(`${base}/subscriptions?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        }),
+      ]);
+
       setVehicles(Array.isArray(data?.vehicles) ? data.vehicles : []);
       setActiveSA(Array.isArray(data?.active) ? data.active : []);
       setSaRegistrations(Array.isArray(data?.saRegistrations) ? data.saRegistrations : []);
+
+      if (subRes.ok) {
+        const raw = await subRes.json();
+        const subs: SubscriptionRow[] = Array.isArray(raw)
+          ? raw
+          : (raw?.data || []);
+        setSubscriptions(
+          subs.map((s) => ({
+            userId: String(s.userId ?? ''),
+            status: String(s.status ?? ''),
+          })),
+        );
+      } else {
+        setSubscriptions([]);
+        console.warn('Subscriptions fetch failed:', subRes.status);
+      }
     } catch (e: unknown) {
       console.error('Error loading fines admin data:', e);
       setError(
@@ -76,6 +141,7 @@ export default function FinesVehiclesPage() {
       setVehicles([]);
       setActiveSA([]);
       setSaRegistrations([]);
+      setSubscriptions([]);
     } finally {
       setLoading(false);
     }
@@ -107,6 +173,10 @@ export default function FinesVehiclesPage() {
   };
 
   const filteredVehicles = vehicles.filter((vehicle) => {
+    if (showNonPremiumMonitoredOnly) {
+      if (!vehicle.isActive) return false;
+      if (premiumUserIds.has(vehicle.userId)) return false;
+    }
     const searchLower = searchTerm.toLowerCase();
     const ownerName = [vehicle.owner?.firstName, vehicle.owner?.lastName]
       .filter(Boolean)
@@ -164,7 +234,18 @@ export default function FinesVehiclesPage() {
               : `${filteredVehicles.length} მანქანა`}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none border rounded-md px-3 py-2 bg-amber-50 border-amber-200">
+            <input
+              type="checkbox"
+              checked={showNonPremiumMonitoredOnly}
+              onChange={(e) => setShowNonPremiumMonitoredOnly(e.target.checked)}
+              className="rounded border-gray-300"
+            />
+            <span>
+              მხოლოდ <strong>არა-პრემიუმი</strong> + ჯარიმების მონიტორინგი ჩართული
+            </span>
+          </label>
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

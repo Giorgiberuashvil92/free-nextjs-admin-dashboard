@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api";
 import { Modal } from "@/components/ui/modal";
 import { useModal } from "@/hooks/useModal";
+import ImageUpload from "@/components/ImageUpload";
 
 type Mechanic = {
   id?: string;
@@ -22,6 +23,7 @@ type Mechanic = {
   likesCount?: number;
   viewsCount?: number;
   callsCount?: number;
+  isFeatured?: boolean;
 };
 
 type EngagementUser = {
@@ -67,6 +69,7 @@ export default function MechanicsAdminPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [vipUpdatingId, setVipUpdatingId] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Mechanic>>({
     name: "",
     specialty: "",
@@ -328,6 +331,44 @@ export default function MechanicsAdminPage() {
     }
   };
 
+  const onUpgradeToVip = async (id?: string) => {
+    if (!id || vipUpdatingId) return;
+    setVipUpdatingId(id);
+    setError("");
+    try {
+      await apiPatch(`/mechanics/${id}/upgrade-to-vip`, {});
+      await load();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "message" in e
+          ? String((e as { message?: string }).message)
+          : "VIP-ზე გადაყვანა ვერ მოხერხდა";
+      setError(msg);
+      console.error(e);
+    } finally {
+      setVipUpdatingId(null);
+    }
+  };
+
+  const onRemoveFromVip = async (id?: string) => {
+    if (!id || vipUpdatingId) return;
+    setVipUpdatingId(id);
+    setError("");
+    try {
+      await apiPatch(`/mechanics/${id}/remove-vip`, {});
+      await load();
+    } catch (e: unknown) {
+      const msg =
+        e && typeof e === "object" && "message" in e
+          ? String((e as { message?: string }).message)
+          : "VIP-დან მოხსნა ვერ მოხერხდა";
+      setError(msg);
+      console.error(e);
+    } finally {
+      setVipUpdatingId(null);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -460,7 +501,7 @@ export default function MechanicsAdminPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Avatar URL</label>
+                <label className="block text-sm font-medium mb-1">Avatar URL (ალტერნატივა)</label>
                 <input
                   value={form.avatar || ""}
                   onChange={(e) => setForm({ ...form, avatar: e.target.value })}
@@ -495,6 +536,18 @@ export default function MechanicsAdminPage() {
                 <label htmlFor="isAvailable" className="text-sm">ხელმისაწვდომია</label>
               </div>
             </div>
+            <ImageUpload
+              value={form.avatar ? [form.avatar] : []}
+              onChange={(urls) =>
+                setForm({
+                  ...form,
+                  avatar: urls[0] || "",
+                })
+              }
+              maxImages={1}
+              folder="mechanics"
+              label="მექანიკოსის ფოტო"
+            />
             <div className="flex gap-2">
               <button
                 type="submit"
@@ -558,9 +611,16 @@ export default function MechanicsAdminPage() {
                   <td className="px-4 py-2">{m.location || "-"}</td>
                   <td className="px-4 py-2">{m.phone || "-"}</td>
                   <td className="px-4 py-2">
-                    <span className={`text-xs px-2 py-1 rounded ${m.isAvailable ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}`}>
-                      {m.isAvailable ? "ხელმისაწვდომი" : "დაკავებული"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded ${m.isAvailable ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-700"}`}>
+                        {m.isAvailable ? "ხელმისაწვდომი" : "დაკავებული"}
+                      </span>
+                      {m.isFeatured ? (
+                        <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800">
+                          VIP
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2 text-xs">
@@ -586,6 +646,19 @@ export default function MechanicsAdminPage() {
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex gap-3">
+                      <button
+                        onClick={() => (m.isFeatured ? onRemoveFromVip(m.id) : onUpgradeToVip(m.id))}
+                        disabled={!m.id || vipUpdatingId === m.id}
+                        className="text-amber-700 hover:text-amber-900 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {vipUpdatingId === m.id
+                          ? m.isFeatured
+                            ? "VIP-დან იხსნება..."
+                            : "VIP-ზე აჰყავს..."
+                          : m.isFeatured
+                            ? "VIP-ის მოხსნა"
+                            : "VIP-ზე აყვანა"}
+                      </button>
                       <button onClick={() => onEdit(m)} className="text-blue-600 hover:text-blue-800">რედაქტირება</button>
                       <button onClick={() => onDelete(m.id)} className="text-red-600 hover:text-red-800">წაშლა</button>
                     </div>
