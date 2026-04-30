@@ -52,8 +52,10 @@ export default function NewDetailingPage() {
         longitude: form.longitude ? parseFloat(form.longitude) : undefined,
       };
 
-      const result = await apiPost("/detailing", payload) as { success?: boolean; message?: string };
-      if (result.success) {
+      const result = await apiPost("/detailing", payload) as { success?: boolean; message?: string; data?: unknown; id?: string; _id?: string };
+      const createdSuccessfully =
+        result?.success === true || !!result?.data || !!result?.id || !!result?._id;
+      if (createdSuccessfully) {
         router.push("/detailing");
       } else {
         setError(result.message || "შეცდომა მოხდა");
