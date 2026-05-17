@@ -1,5 +1,6 @@
 "use client";
 
+import "leaflet/dist/leaflet.css";
 import { useEffect, useState } from "react";
 
 type EvMapPickerProps = {
@@ -27,7 +28,6 @@ export default function EvMapPicker({
     (async () => {
       const leafletModule = await import("react-leaflet");
       const L = await import("leaflet");
-      await import("leaflet/dist/leaflet.css");
       delete (L.default.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
       L.default.Icon.Default.mergeOptions({
         iconRetinaUrl:
