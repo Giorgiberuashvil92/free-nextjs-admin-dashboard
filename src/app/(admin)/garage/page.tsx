@@ -29,10 +29,48 @@ const API_BASE = typeof window !== 'undefined' && window.location.hostname === '
   ? '/api/proxy' 
   : BACKEND_URL;
 
+const PUSH_SCREEN_BY_TYPE: Record<string, string> = {
+  general: "Notifications",
+  fuel_discount: "ExclusiveFuelOffer",
+  new_offer: "OfferDetails",
+  garage_reminder: "Garage",
+};
+
+function applyOfferTemplate(template: string, car: Car, user: User): string {
+  const firstName = (user.firstName || "").trim();
+  const lastName = (user.lastName || "").trim();
+  const patron = firstName || "მომხმარებელო";
+  const map: Record<string, string> = {
+    firstName,
+    lastName,
+    name: [firstName, lastName].filter(Boolean).join(" ").trim() || patron,
+    patronName: patron,
+    make: (car.make || "").trim(),
+    model: (car.model || "").trim(),
+    brand: (car.make || "").trim(),
+    year: car.year != null ? String(car.year) : "",
+    plateNumber: (car.plateNumber || "").trim(),
+  };
+  let out = template;
+  for (const [k, v] of Object.entries(map)) {
+    out = out.split(`{{${k}}}`).join(v);
+  }
+  return out;
+}
+
 export default function GaragePage() {
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(false);
   const [q, setQ] = useState("");
+
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [campaignTitleTpl, setCampaignTitleTpl] = useState("შეთავაზება {{make}}-ის მფლობელებს");
+  const [campaignBodyTpl, setCampaignBodyTpl] = useState(
+    "გამარჯობა {{patronName}}, გვინდა გაგიზიაროთ სპეციალური შეთავაზება შენს {{make}} {{model}}-ზე.",
+  );
+  const [pushType, setPushType] = useState<keyof typeof PUSH_SCREEN_BY_TYPE>("fuel_discount");
+  const [excludePremium, setExcludePremium] = useState(false);
+  const [campaignSending, setCampaignSending] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -94,6 +132,103 @@ export default function GaragePage() {
     };
   }, [cars]);
 
+  const uniqueMakes = useMemo(() => {
+    const s = new Set<string>();
+    cars.forEach((c) => {
+      const m = (c.make || "").trim();
+      if (m) s.add(m);
+    });
+    return [...s].sort((a, b) => a.localeCompare(b, "ka"));
+  }, [cars]);
+
+  const selectedBrandsLower = useMemo(
+    () => new Set(selectedBrands.map((b) => b.trim().toLowerCase()).filter(Boolean)),
+    [selectedBrands],
+  );
+
+  /** უნიკალური იუზერი + ერთი მანქანა (არჩეული ბრენდიდან პირველი შესაბამისი) — ტექსტის ცვლადებისთვის */
+  const campaignRecipients = useMemo(() => {
+    if (selectedBrandsLower.size === 0) return [] as Array<{ userId: string; car: Car; user: User }>;
+    const byUser = new Map<string, { car: Car; user: User }>();
+    for (const car of filtered) {
+      const mk = (car.make || "").trim().toLowerCase();
+      if (!mk || !selectedBrandsLower.has(mk)) continue;
+      const uid = (car.userId || "").trim();
+      const u = car.user;
+      if (!uid || !u) continue;
+      if (!byUser.has(uid)) byUser.set(uid, { car, user: u });
+    }
+    return [...byUser.entries()].map(([userId, { car, user }]) => ({ userId, car, user }));
+  }, [filtered, selectedBrandsLower]);
+
+  const toggleBrand = (make: string) => {
+    setSelectedBrands((prev) => {
+      const m = make.trim();
+      if (!m) return prev;
+      if (prev.includes(m)) return prev.filter((x) => x !== m);
+      return [...prev, m];
+    });
+  };
+
+  const sendBrandCampaign = async () => {
+    if (selectedBrands.length === 0) {
+      alert("აირჩიე მინიმუმ ერთი ბრენდი (მაგ. Toyota, BMW).");
+      return;
+    }
+    if (!campaignTitleTpl.trim() || !campaignBodyTpl.trim()) {
+      alert("შეიყვანე შაბლონის სათაური და ტექსტი.");
+      return;
+    }
+    if (campaignRecipients.length === 0) {
+      alert("არჩეული ბრენდით იუზერი ვერ მოიძებნა (ან ძიების შედეგი ცარიელია).");
+      return;
+    }
+    const sample = campaignRecipients
+      .slice(0, 2)
+      .map((r) => `${r.user.firstName || r.userId}: "${applyOfferTemplate(campaignBodyTpl, r.car, r.user).slice(0, 80)}…"`)
+      .join("\n");
+    if (
+      !confirm(
+        `გაგზავნა ${campaignRecipients.length} იუზერზე პერსონალიზებული push?\n\nნიმუში:\n${sample}\n\nტიპი: ${pushType}`,
+      )
+    )
+      return;
+
+    setCampaignSending(true);
+    try {
+      const screen = PUSH_SCREEN_BY_TYPE[pushType] || "Notifications";
+      const items = campaignRecipients.map((r) => ({
+        userId: r.userId,
+        title: applyOfferTemplate(campaignTitleTpl, r.car, r.user),
+        body: applyOfferTemplate(campaignBodyTpl, r.car, r.user),
+      }));
+      const res = await fetch(`${API_BASE}/notifications/broadcast-personalized`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items,
+          excludePremium,
+          data: {
+            type: pushType,
+            screen,
+            source: "admin_garage_campaign",
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((json as { message?: string }).message || `HTTP ${res.status}`);
+      }
+      alert((json as { message?: string }).message || "გაგზავნილია");
+    } catch (e) {
+      console.error(e);
+      alert(`შეცდომა: ${e instanceof Error ? e.message : "უცნობი"}`);
+    } finally {
+      setCampaignSending(false);
+    }
+  };
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -126,6 +261,106 @@ export default function GaragePage() {
           <div className="text-sm text-gray-500">იუზერის გარეშე</div>
           <div className="text-2xl font-bold text-orange-600">{stats.withoutUsers}</div>
         </div>
+      </div>
+
+      {/* მარკეტინგული კამპანია — სეგმენტი ბრენდით + პერსონალიზებული push */}
+      <div className="mb-6 border border-violet-200 bg-violet-50/60 rounded-lg p-5">
+        <h2 className="text-lg font-semibold text-violet-900 mb-1">მარკეტინგული კამპანია (ბრენდი → იუზერი)</h2>
+        <p className="text-sm text-violet-800/90 mb-4">
+          აირჩიე ბრენდ(ებ)ი, შეავსე შაბლონი ცვლადებით:{" "}
+          <code className="text-xs bg-white/80 px-1 rounded">{"{{patronName}}"}</code>,{" "}
+          <code className="text-xs bg-white/80 px-1 rounded">{"{{firstName}}"}</code>,{" "}
+          <code className="text-xs bg-white/80 px-1 rounded">{"{{make}}"}</code>,{" "}
+          <code className="text-xs bg-white/80 px-1 rounded">{"{{model}}"}</code>,{" "}
+          <code className="text-xs bg-white/80 px-1 rounded">{"{{year}}"}</code>,{" "}
+          <code className="text-xs bg-white/80 px-1 rounded">{"{{plateNumber}}"}</code>.
+          სია იღებს მხოლოდ ზემოთ ძიებით გაფილტრულ მანქანებს.
+        </p>
+
+        <div className="mb-3">
+          <div className="text-sm font-medium text-gray-700 mb-2">ბრენდის არჩევა</div>
+          <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+            {uniqueMakes.length === 0 ? (
+              <span className="text-sm text-gray-500">მანქანები ჯერ არ ჩანს</span>
+            ) : (
+              uniqueMakes.map((make) => {
+                const on = selectedBrands.includes(make);
+                return (
+                  <button
+                    key={make}
+                    type="button"
+                    onClick={() => toggleBrand(make)}
+                    className={`text-sm px-3 py-1.5 rounded-full border transition-colors ${
+                      on
+                        ? "bg-violet-600 text-white border-violet-600"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-violet-300"
+                    }`}
+                  >
+                    {make}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">სათაურის შაბლონი</label>
+            <input
+              value={campaignTitleTpl}
+              onChange={(e) => setCampaignTitleTpl(e.target.value)}
+              className="w-full border rounded-md px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">აპში გახსნის ტიპი</label>
+            <select
+              value={pushType}
+              onChange={(e) => setPushType(e.target.value as keyof typeof PUSH_SCREEN_BY_TYPE)}
+              className="w-full border rounded-md px-3 py-2 text-sm bg-white"
+            >
+              <option value="fuel_discount">საწვავის შეთავაზება (ExclusiveFuelOffer)</option>
+              <option value="new_offer">შეთავაზებები (OfferDetails)</option>
+              <option value="garage_reminder">გარაჟი</option>
+              <option value="general">ზოგადი (Notifications)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">ტექსტის შაბლონი (body)</label>
+          <textarea
+            value={campaignBodyTpl}
+            onChange={(e) => setCampaignBodyTpl(e.target.value)}
+            rows={3}
+            className="w-full border rounded-md px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludePremium}
+              onChange={(e) => setExcludePremium(e.target.checked)}
+            />
+            Premium იუზერები არ მივაწვდინოთ
+          </label>
+          <span className="text-sm text-gray-600">
+            მიმღები იუზერები (უნიკალური):{" "}
+            <strong>{campaignRecipients.length}</strong>
+          </span>
+        </div>
+
+        <button
+          type="button"
+          disabled={campaignSending || campaignRecipients.length === 0}
+          onClick={sendBrandCampaign}
+          className="px-4 py-2 rounded-md bg-violet-600 text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-violet-700"
+        >
+          {campaignSending ? "იგზავნება…" : "პერსონალიზებული push-ის გაგზავნა"}
+        </button>
       </div>
 
       {/* Cars Table */}

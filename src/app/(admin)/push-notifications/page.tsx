@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { apiGetJson, API_BASE } from '@/lib/api';
+import {
+  buildCommunityPushData,
+  COMMUNITY_PUSH_META,
+  type CommunityPushKind,
+} from '@/lib/communityPush';
 import {
   type ResolvedUserRow,
   resolvedDisplayName,
@@ -50,7 +56,16 @@ type NotificationType =
   | 'ai_recommendation'
   | 'offer_status'
   | 'radar'
-  | 'radar_alert';
+  | 'radar_alert'
+  | 'garage_fines_reminder'
+  | 'garage_activity'
+  | 'community_post'
+  | 'community_comment'
+  | 'community_like'
+  | 'club_post'
+  | 'club_invite'
+  | 'club_join'
+  | 'new_follower';
 
 type UserStats = { total: number; active: number; byRole: Record<string, number> };
 type User = { id: string; phone: string; firstName?: string; lastName?: string; email?: string; role?: string; isActive?: boolean; avatar?: string; profileImage?: string };
@@ -139,6 +154,69 @@ const NOTIFICATION_TYPES: NotificationTypeConfig[] = [
     icon: '🚨',
     description: 'რადარის alert — აპში გადავა /radars გვერდზე',
   },
+  {
+    type: 'garage_fines_reminder',
+    label: 'ჯარიმების შეხსენება',
+    screen: 'GarageFines',
+    icon: '🚨',
+    description: 'აპში /garage/fines — იგივე რაც fines cron / UserContext',
+  },
+  {
+    type: 'garage_activity',
+    label: 'მძღოლების აქტივობა',
+    screen: 'GarageActivity',
+    icon: '⛽',
+    description: 'საწვავი/სერვისის ლენტა — აპში /garage-activity',
+  },
+  {
+    type: 'community_post',
+    label: 'კომუნიტის პოსტი',
+    screen: 'Community',
+    icon: '💬',
+    description: 'ზოგადი პოსტი — /(tabs)/community (ოფც.: data.postId highlight-ისთვის)',
+  },
+  {
+    type: 'community_comment',
+    label: 'კომენტარი პოსტზე',
+    screen: 'Comments',
+    icon: '💭',
+    description: '/comments — სავალდებულო: postId; ოფც.: commentId, postUserId',
+  },
+  {
+    type: 'community_like',
+    label: 'ლაიქი პოსტზე',
+    screen: 'Comments',
+    icon: '❤️',
+    description: 'იგივე მარშრუტი რაც community_comment',
+  },
+  {
+    type: 'club_post',
+    label: 'კლუბის პოსტი',
+    screen: 'groups',
+    icon: '👥',
+    description: 'კლუბის გვერდი — /groups/[id] (data.groupId ან clubId)',
+  },
+  {
+    type: 'club_invite',
+    label: 'კლუბის მოწვევა',
+    screen: 'groups',
+    icon: '✉️',
+    description: 'კლუბში შემოწვევა — /groups/[id]',
+  },
+  {
+    type: 'club_join',
+    label: 'კლუბში გაწევრიანება',
+    screen: 'groups',
+    icon: '👤',
+    description: 'ახალი წევრი — ავტომატურად იგზავნება join-ისას; /groups/[id]',
+  },
+  {
+    type: 'new_follower',
+    label: 'ახალი გამომწერი',
+    screen: 'Profile',
+    icon: '➕',
+    description: 'პროფილი — /profile/[userId] (data.userId ან followerId)',
+  },
 ];
 
 const formatDate = (d?: string) =>
@@ -161,6 +239,7 @@ export default function PushNotificationsPage() {
   const [sendToType, setSendToType] = useState<SendToType>('active');
   const [role, setRole] = useState('');
   const [activeOnly, setActiveOnly] = useState(false);
+  const [excludePremium, setExcludePremium] = useState(false);
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState<{ sent: number; total: number; failed?: number } | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -181,6 +260,16 @@ export default function PushNotificationsPage() {
   const [manualTitle, setManualTitle] = useState('🚨 ჯარიმების შეხსენება');
   const [manualBody, setManualBody] = useState('გადაამოწმე ახალი ჯარიმები აპში — შესაძლოა გაქვს გადასახდელი ჩანაწერები.');
   const [deleteSaId, setDeleteSaId] = useState('');
+  const [pushPostId, setPushPostId] = useState('');
+  const [pushCommentId, setPushCommentId] = useState('');
+  const [pushPostUserId, setPushPostUserId] = useState('');
+  const [pushGroupId, setPushGroupId] = useState('');
+  const [pushGroupName, setPushGroupName] = useState('');
+  const [pushActorUserId, setPushActorUserId] = useState('');
+  const [pushJoinerName, setPushJoinerName] = useState('');
+
+  const isCommunityKind = (t: NotificationType): t is CommunityPushKind =>
+    Object.prototype.hasOwnProperty.call(COMMUNITY_PUSH_META, t);
 
   /** Load consent data */
   const loadConsent = useCallback(async () => {
@@ -356,16 +445,33 @@ export default function PushNotificationsPage() {
       const names = selectedUsers.slice(0, 3).map((u) => (u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.phone || u.id)).join(', ');
       confirmMessage += `მიმღები: ${selectedUsers.length} user${selectedUsers.length > 3 ? '...' : ''} (${names}${selectedUsers.length > 3 ? '...' : ''})`;
     }
+    if (excludePremium) confirmMessage += `\n\n✓ Premium გამოწერის მქონეებს არ მივაწვდენით (excludePremium).`;
     if (!confirm(confirmMessage)) return;
 
     setSending(true);
     setLastResult(null);
     try {
       const typeConfig = NOTIFICATION_TYPES.find((t) => t.type === notificationType) || NOTIFICATION_TYPES[0];
+      const baseData = isCommunityKind(notificationType)
+        ? buildCommunityPushData(notificationType, {
+            postId: pushPostId,
+            commentId: pushCommentId,
+            postUserId: pushPostUserId,
+            groupId: pushGroupId,
+            groupName: pushGroupName,
+            userId: pushActorUserId,
+            followerId: pushActorUserId,
+            joinerName: pushJoinerName,
+          })
+        : {
+            type: typeConfig.type,
+            screen: typeConfig.screen,
+            timestamp: new Date().toISOString(),
+          };
       const requestBody: any = {
         title: title.trim(),
         body: body.trim(),
-        data: { type: typeConfig.type, screen: typeConfig.screen, timestamp: new Date().toISOString() },
+        data: baseData,
       };
       if (sendToType === 'active') requestBody.active = true;
       if (sendToType === 'role') {
@@ -373,6 +479,7 @@ export default function PushNotificationsPage() {
         if (activeOnly) requestBody.active = true;
       }
       if (sendToType === 'userIds') requestBody.userIds = selectedUsers.map((u) => u.id);
+      if (excludePremium) requestBody.excludePremium = true;
 
       const res = await fetch(`${API_BASE}/notifications/broadcast`, {
         method: 'POST',
@@ -395,6 +502,7 @@ export default function PushNotificationsPage() {
       setSendToType('active');
       setRole('');
       setActiveOnly(false);
+      setExcludePremium(false);
       setSelectedUsers([]);
       setUserSearchQuery('');
       loadUserStats();
@@ -944,6 +1052,77 @@ export default function PushNotificationsPage() {
             </div>
           </div>
 
+          {isCommunityKind(notificationType) ? (
+            <div className="p-4 rounded-xl border-2 border-indigo-200 dark:border-indigo-800 bg-indigo-50/60 dark:bg-indigo-900/20 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">
+                  კომუნიტი / კლუბი — დამატებითი data
+                </p>
+                <Link href="/community-clubs" className="text-xs text-indigo-700 dark:text-indigo-300 underline">
+                  სრული მართვა →
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {(notificationType === 'community_comment' ||
+                  notificationType === 'community_like' ||
+                  notificationType === 'community_post') && (
+                  <>
+                    <input
+                      value={pushPostId}
+                      onChange={(e) => setPushPostId(e.target.value)}
+                      placeholder="postId"
+                      className="border rounded-lg px-3 py-2 text-sm font-mono dark:bg-gray-700"
+                    />
+                    <input
+                      value={pushCommentId}
+                      onChange={(e) => setPushCommentId(e.target.value)}
+                      placeholder="commentId"
+                      className="border rounded-lg px-3 py-2 text-sm font-mono dark:bg-gray-700"
+                    />
+                    <input
+                      value={pushPostUserId}
+                      onChange={(e) => setPushPostUserId(e.target.value)}
+                      placeholder="postUserId"
+                      className="border rounded-lg px-3 py-2 text-sm font-mono dark:bg-gray-700"
+                    />
+                  </>
+                )}
+                {notificationType.startsWith('club_') && (
+                  <>
+                    <input
+                      value={pushGroupId}
+                      onChange={(e) => setPushGroupId(e.target.value)}
+                      placeholder="groupId"
+                      className="border rounded-lg px-3 py-2 text-sm font-mono dark:bg-gray-700"
+                    />
+                    <input
+                      value={pushGroupName}
+                      onChange={(e) => setPushGroupName(e.target.value)}
+                      placeholder="groupName"
+                      className="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700"
+                    />
+                    {notificationType === 'club_join' ? (
+                      <input
+                        value={pushJoinerName}
+                        onChange={(e) => setPushJoinerName(e.target.value)}
+                        placeholder="joinerName"
+                        className="border rounded-lg px-3 py-2 text-sm dark:bg-gray-700"
+                      />
+                    ) : null}
+                  </>
+                )}
+                {notificationType === 'new_follower' && (
+                  <input
+                    value={pushActorUserId}
+                    onChange={(e) => setPushActorUserId(e.target.value)}
+                    placeholder="userId"
+                    className="border rounded-lg px-3 py-2 text-sm font-mono dark:bg-gray-700 md:col-span-2"
+                  />
+                )}
+              </div>
+            </div>
+          ) : null}
+
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               <span className="text-lg">👥</span>
@@ -956,6 +1135,7 @@ export default function PushNotificationsPage() {
                 setSendToType(e.target.value as SendToType);
                 setRole('');
                 setActiveOnly(false);
+                setExcludePremium(false);
                 setSelectedUsers([]);
                 setUserSearchQuery('');
                 setShowUserDropdown(false);
@@ -967,6 +1147,21 @@ export default function PushNotificationsPage() {
               <option value="role">კონკრეტული Role-ის User-ებს</option>
               <option value="userIds">კონკრეტული User-ები (არჩევით)</option>
             </select>
+            <label className="mt-3 flex items-start gap-3 cursor-pointer rounded-xl border-2 border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-900/20 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={excludePremium}
+                onChange={(e) => setExcludePremium(e.target.checked)}
+                className="mt-0.5 w-5 h-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                disabled={sending}
+              />
+              <span className="text-sm text-gray-800 dark:text-gray-200">
+                <span className="font-semibold">არ გავუგზავნოთ აქტიურ Premium მომხმარებლებს</span>
+                <span className="block text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  API: <code className="text-[11px]">excludePremium: true</code> — ფილტრდება subscriptions კოლექციით (status active + planId premium).
+                </span>
+              </span>
+            </label>
           </div>
 
           {sendToType === 'role' && (

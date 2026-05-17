@@ -328,7 +328,7 @@ export default function OffersAdminPage() {
             value={form.subtitle}
             onChange={(e) => setForm((p) => ({ ...p, subtitle: e.target.value }))}
             className="border rounded-md px-3 py-2"
-            placeholder="ქვესათაური (მაგ. −17 თთ ლიტრზე)"
+            placeholder="ქვესათაური (მაგ. −17 თეთრი / ლიტრი)"
           />
           <input
             value={form.route}

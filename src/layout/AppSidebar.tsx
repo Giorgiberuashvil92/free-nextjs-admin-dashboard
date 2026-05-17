@@ -112,6 +112,11 @@ const navItems: NavItem[] = [
     path: "/carwashes",
   },
   {
+    icon: <PlugInIcon />,
+    name: "EV დამუხტვა",
+    path: "/ev-charging",
+  },
+  {
     icon: <PieChartIcon />,
     name: "მანქანების გაქირავება",
     path: "/car-rentals",
@@ -240,6 +245,11 @@ const navItems: NavItem[] = [
     icon: <PieChartIcon />,
     name: "Push Notifications",
     path: "/push-notifications",
+  },
+  {
+    icon: <PieChartIcon />,
+    name: "კომუნიტი & კლუბები",
+    path: "/community-clubs",
   },
   {
     icon: <PieChartIcon />,
