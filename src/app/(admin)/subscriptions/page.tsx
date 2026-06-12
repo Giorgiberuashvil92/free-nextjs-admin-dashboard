@@ -401,6 +401,84 @@ export default function SubscriptionsPage() {
     return colors[status] || "bg-gray-100 text-gray-800";
   };
 
+  const csvEscapeCell = (value: unknown) => {
+    const text = String(value ?? "");
+    if (/[",\n\r;]/.test(text)) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  };
+
+  const exportToCSV = () => {
+    const headers = [
+      "User ID",
+      "პლანი",
+      "თანხა",
+      "ვალუტა",
+      "პერიოდი",
+      "სტატუსი",
+      "დაწყების თარიღი",
+      "შემდეგი გადახდა",
+      "ციკლები",
+      "სულ გადახდილი",
+      "Plan ID",
+      "Order ID",
+      "Rejected გადახდები",
+      "Rejected მიზეზი",
+      "შექმნის თარიღი",
+      "განახლების თარიღი",
+    ];
+
+    const rows = subscriptions.map((subscription) => {
+      const rejectedPayments = rejectedPaymentsMap[subscription._id] || [];
+      const latestRejectedPayment = rejectedPayments.length > 0
+        ? rejectedPayments.sort(
+            (a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+          )[0]
+        : null;
+
+      return [
+        subscription.userId,
+        subscription.planName,
+        subscription.planPrice,
+        subscription.currency,
+        subscription.period,
+        subscription.status,
+        subscription.startDate || "",
+        subscription.nextBillingDate || "",
+        subscription.billingCycles,
+        subscription.totalPaid.toFixed(2),
+        subscription.planId,
+        subscription.orderId || "",
+        rejectedPayments.length,
+        latestRejectedPayment?.codeDescription ||
+          latestRejectedPayment?.metadata?.bogCallbackData?.reject_reason ||
+          "",
+        subscription.createdAt,
+        subscription.updatedAt,
+      ];
+    });
+
+    const csvContent = `\uFEFF${[
+      headers.join(";"),
+      ...rows.map((row) => row.map(csvEscapeCell).join(";")),
+    ].join("\r\n")}`;
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute(
+      "download",
+      `subscriptions_${new Date().toISOString().split("T")[0]}.csv`
+    );
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -413,12 +491,21 @@ export default function SubscriptionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">საბსქრიფშენები</h1>
-        <button
-          onClick={fetchSubscriptions}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          განახლება
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={exportToCSV}
+            disabled={subscriptions.length === 0}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            CSV-ში ექსპორტი
+          </button>
+          <button
+            onClick={fetchSubscriptions}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            განახლება
+          </button>
+        </div>
       </div>
 
       {error && (
