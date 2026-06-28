@@ -102,6 +102,7 @@ export default function SubscriptionsPage() {
   const [subscriptionPayments, setSubscriptionPayments] = useState<Payment[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [updatingToken, setUpdatingToken] = useState<string | null>(null);
+  const [deletingSubscriptionId, setDeletingSubscriptionId] = useState<string | null>(null);
   const [rejectedPaymentsMap, setRejectedPaymentsMap] = useState<Record<string, Payment[]>>({});
 
   useEffect(() => {
@@ -268,6 +269,41 @@ export default function SubscriptionsPage() {
       setSubscriptionPayments([]);
     } finally {
       setLoadingPayments(false);
+    }
+  };
+
+  const handleDeleteSubscription = async (subscription: Subscription) => {
+    const ok = confirm(
+      `ნამდვილად გსურთ ამ საბსქრიფშენის წაშლა?\n\nUser ID: ${subscription.userId}\nპლანი: ${subscription.planName}\nსტატუსი: ${subscription.status}\n\nმომხმარებელი აპში Free გახდება.`,
+    );
+    if (!ok) return;
+
+    setDeletingSubscriptionId(subscription._id);
+    try {
+      const response = await fetch(`${API_BASE}/subscriptions/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subscriptionId: subscription._id,
+          userId: subscription.userId,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert("✅ საბსქრიფშენი წაიშალა");
+        if (selectedSubscription?._id === subscription._id) {
+          setSelectedSubscription(null);
+          setSubscriptionPayments([]);
+        }
+        await fetchSubscriptions();
+      } else {
+        alert(`❌ შეცდომა: ${result.message || result.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Error deleting subscription:", err);
+      alert(`❌ შეცდომა: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      setDeletingSubscriptionId(null);
     }
   };
 
@@ -850,12 +886,24 @@ export default function SubscriptionsPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => fetchSubscriptionPayments(subscription)}
                           className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs"
                         >
                           გადახდები
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteSubscription(subscription)}
+                          disabled={deletingSubscriptionId === subscription._id}
+                          className={`px-3 py-1 rounded text-xs text-white ${
+                            deletingSubscriptionId === subscription._id
+                              ? "bg-gray-400 cursor-not-allowed"
+                              : "bg-red-600 hover:bg-red-700"
+                          }`}
+                          title="საბსქრიფშენის წაშლა ბაზიდან"
+                        >
+                          {deletingSubscriptionId === subscription._id ? "იშლება…" : "🗑️ წაშლა"}
                         </button>
                         {subscription.bogCardToken && subscription.bogCardToken.includes('subscription_') && (
                           <button

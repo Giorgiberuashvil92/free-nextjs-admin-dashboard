@@ -82,6 +82,11 @@ export default function FinesVehiclesPage() {
   /** ნაგულისხმევად: მხოლოდ არა-პრემიუმი + ჯარიმების მონიტორინგი ჩართული (isActive) */
   const [showNonPremiumMonitoredOnly, setShowNonPremiumMonitoredOnly] =
     useState(true);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const premiumUserIds = useMemo(() => {
     return new Set(
@@ -172,6 +177,101 @@ export default function FinesVehiclesPage() {
     }
   };
 
+  const isUserPremium = useCallback(
+    (userId: string) => premiumUserIds.has(userId),
+    [premiumUserIds],
+  );
+
+  const postSubscriptionAction = async (
+    path: '/subscriptions/grant-premium' | '/subscriptions/revoke-premium',
+    body: { phone?: string; userId: string; period?: 'monthly' | 'yearly' | 'lifetime' },
+  ) => {
+    const base = getClientApiBase();
+    const response = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false) {
+      throw new Error(result.message || result.error || 'მოთხოვნა ვერ შესრულდა');
+    }
+    return result;
+  };
+
+  const handleGrantPremium = async (vehicle: RegisteredVehicleWithOwner) => {
+    const ownerLabel = vehicle.owner
+      ? [vehicle.owner.firstName, vehicle.owner.lastName].filter(Boolean).join(' ') ||
+        vehicle.owner.phone
+      : vehicle.userId;
+
+    if (
+      !confirm(
+        `ნამდვილად გსურთ Premium მიცემა?\n\nმფლობელი: ${ownerLabel}\nმანქანა: ${vehicle.vehicleNumber}`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyUserId(vehicle.userId);
+    setActionMessage(null);
+    try {
+      await postSubscriptionAction('/subscriptions/grant-premium', {
+        userId: vehicle.userId,
+        phone: vehicle.owner?.phone,
+        period: 'monthly',
+      });
+      setActionMessage({
+        type: 'success',
+        text: `Premium მიენიჭა: ${ownerLabel}`,
+      });
+      await load();
+    } catch (e: unknown) {
+      setActionMessage({
+        type: 'error',
+        text: (e as Error)?.message || 'Premium მიცემა ვერ მოხერხდა',
+      });
+    } finally {
+      setBusyUserId(null);
+    }
+  };
+
+  const handleRevokePremium = async (vehicle: RegisteredVehicleWithOwner) => {
+    const ownerLabel = vehicle.owner
+      ? [vehicle.owner.firstName, vehicle.owner.lastName].filter(Boolean).join(' ') ||
+        vehicle.owner.phone
+      : vehicle.userId;
+
+    if (
+      !confirm(
+        `ნამდვილად გსურთ საბსქრიფშენის გაუქმება?\n\nმფლობელი: ${ownerLabel}\nმანქანა: ${vehicle.vehicleNumber}`,
+      )
+    ) {
+      return;
+    }
+
+    setBusyUserId(vehicle.userId);
+    setActionMessage(null);
+    try {
+      await postSubscriptionAction('/subscriptions/revoke-premium', {
+        userId: vehicle.userId,
+        phone: vehicle.owner?.phone,
+      });
+      setActionMessage({
+        type: 'success',
+        text: `საბსქრიფშენი გაუქმდა: ${ownerLabel}`,
+      });
+      await load();
+    } catch (e: unknown) {
+      setActionMessage({
+        type: 'error',
+        text: (e as Error)?.message || 'საბსქრიფშენის გაუქმება ვერ მოხერხდა',
+      });
+    } finally {
+      setBusyUserId(null);
+    }
+  };
+
   const filteredVehicles = vehicles.filter((vehicle) => {
     if (showNonPremiumMonitoredOnly) {
       if (!vehicle.isActive) return false;
@@ -246,6 +346,11 @@ export default function FinesVehiclesPage() {
               მხოლოდ <strong>არა-პრემიუმი</strong> + ჯარიმების მონიტორინგი ჩართული
             </span>
           </label>
+          {showNonPremiumMonitoredOnly && (
+            <span className="text-xs text-gray-500">
+              Premium-ის წასაშლელად გამორთე ზემოთ მონიშვნა
+            </span>
+          )}
           <input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -260,6 +365,18 @@ export default function FinesVehiclesPage() {
           </button>
         </div>
       </div>
+
+      {actionMessage && (
+        <div
+          className={`mb-4 px-4 py-3 rounded border ${
+            actionMessage.type === 'success'
+              ? 'bg-green-50 border-green-200 text-green-800'
+              : 'bg-red-50 border-red-200 text-red-800'
+          }`}
+        >
+          {actionMessage.text}
+        </div>
+      )}
 
       {/* SA აქტივი + ვის დაამატა */}
       <div className="mb-8">
@@ -324,11 +441,17 @@ export default function FinesVehiclesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white border rounded-lg p-4">
           <div className="text-sm text-gray-500">სულ დარეგისტრირებული (ბაზა)</div>
           <div className="text-2xl font-bold text-gray-900">
             {vehicles.length}
+          </div>
+        </div>
+        <div className="bg-white border rounded-lg p-4">
+          <div className="text-sm text-gray-500">არა-პრემიუმი + მონიტორინგი</div>
+          <div className="text-2xl font-bold text-amber-600">
+            {nonPremiumMonitoredStats.users} იუზერი / {nonPremiumMonitoredStats.vehicles} მანქანა
           </div>
         </div>
         <div className="bg-white border rounded-lg p-4">
@@ -365,13 +488,19 @@ export default function FinesVehiclesPage() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 დამატების თარიღი
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Premium
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                მოქმედებები
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredVehicles.length === 0 ? (
               <tr>
                 <td
-                  colSpan={5}
+                  colSpan={7}
                   className="px-6 py-8 text-center text-gray-500"
                 >
                   {searchTerm
@@ -380,10 +509,14 @@ export default function FinesVehiclesPage() {
                 </td>
               </tr>
             ) : (
-              filteredVehicles.map((vehicle) => (
+              filteredVehicles.map((vehicle) => {
+                const premium = isUserPremium(vehicle.userId);
+                const busy = busyUserId === vehicle.userId;
+
+                return (
                 <tr
                   key={vehicle._id}
-                  className="hover:bg-gray-50 transition-colors"
+                  className={`hover:bg-gray-50 transition-colors ${premium ? 'bg-green-50/40' : ''}`}
                 >
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                     {vehicle.saVehicleId}
@@ -428,8 +561,57 @@ export default function FinesVehiclesPage() {
                       {formatDate(vehicle.addDate || vehicle.createdAt)}
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {premium ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                        Premium
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                        არა
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-wrap gap-2">
+                      {!premium ? (
+                        <button
+                          type="button"
+                          onClick={() => handleGrantPremium(vehicle)}
+                          disabled={busy}
+                          className={`px-3 py-1.5 rounded text-xs font-medium text-white ${
+                            busy
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-green-600 hover:bg-green-700'
+                          }`}
+                        >
+                          {busy ? '...' : 'Premium მიცემა'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRevokePremium(vehicle)}
+                          disabled={busy}
+                          className={`px-3 py-1.5 rounded text-xs font-medium text-white ${
+                            busy
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-red-600 hover:bg-red-700'
+                          }`}
+                        >
+                          {busy ? '...' : 'Premium წაშლა'}
+                        </button>
+                      )}
+                      <a
+                        href={`/users?q=${encodeURIComponent(vehicle.userId)}`}
+                        className="px-3 py-1.5 rounded text-xs font-medium border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        იუზერი
+                      </a>
+                    </div>
+                  </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

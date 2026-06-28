@@ -76,6 +76,12 @@ export default function UsersPage() {
     iosDevices: number;
   } | null>(null);
   const [loadingPlatformStats, setLoadingPlatformStats] = useState(false);
+  const [deletingSubscriptionUserId, setDeletingSubscriptionUserId] = useState<string | null>(null);
+
+  const getApiBase = () =>
+    typeof window !== 'undefined' && window.location.hostname === 'localhost'
+      ? '/api/proxy'
+      : (process.env.NEXT_PUBLIC_API_BASE_URL || 'https://marte-backend-production.up.railway.app');
 
   const load = useCallback(async () => {
     setLoading(true); setErr("");
@@ -210,11 +216,7 @@ export default function UsersPage() {
     }
 
     try {
-      const API_BASE = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
-        ? '/api/proxy' 
-        : (process.env.NEXT_PUBLIC_API_BASE_URL || "https://marte-backend-production.up.railway.app");
-      
-      const res = await fetch(`${API_BASE}/users/${userId}`, {
+      const res = await fetch(`${getApiBase()}/users/${userId}`, {
         method: 'DELETE',
       });
 
@@ -228,6 +230,42 @@ export default function UsersPage() {
     } catch (error) {
       console.error('Error deleting user:', error);
       alert(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleDeleteSubscription = async (userId: string, subscription: { _id?: string; userId?: string; planName?: string; planId?: string; status?: string }) => {
+    const ok = confirm(
+      `ნამდვილად გსურთ ამ საბსქრიფშენის წაშლა?\n\nUser ID: ${userId}\nპლანი: ${subscription.planName || subscription.planId || 'N/A'}\nსტატუსი: ${subscription.status || 'N/A'}\n\nმომხმარებელი აპში Free გახდება. Recurring ჩამოჭრა აღარ მოხდება.`,
+    );
+    if (!ok) return;
+
+    setDeletingSubscriptionUserId(userId);
+    try {
+      const response = await fetch(`${getApiBase()}/subscriptions/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subscriptionId: subscription._id,
+          userId: subscription.userId || userId,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert('✅ საბსქრიფშენი წაიშალა');
+        setUserSubscriptions((prev) => {
+          const next = { ...prev };
+          delete next[userId];
+          return next;
+        });
+        await load();
+      } else {
+        alert(`❌ შეცდომა: ${result.message || result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting subscription:', error);
+      alert(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDeletingSubscriptionUserId(null);
     }
   };
 
@@ -809,6 +847,19 @@ export default function UsersPage() {
                                 ⚠️ ID mismatch
                               </span>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteSubscription(u.id, subscription)}
+                              disabled={deletingSubscriptionUserId === u.id}
+                              className={`mt-1 px-2 py-0.5 text-xs rounded border transition-colors ${
+                                deletingSubscriptionUserId === u.id
+                                  ? 'bg-gray-200 text-gray-500 border-gray-300 cursor-not-allowed'
+                                  : 'text-red-600 border-red-300 hover:bg-red-50 dark:text-red-400 dark:border-red-700 dark:hover:bg-red-900/20'
+                              }`}
+                              title="საბსქრიფშენის წაშლა MongoDB-დან"
+                            >
+                              {deletingSubscriptionUserId === u.id ? 'იშლება…' : '🗑️ საბ. წაშლა'}
+                            </button>
                           </div>
                         );
                       }

@@ -1,6 +1,5 @@
 const BACKEND_URL = "https://marte-backend-production.up.railway.app";
 
-/** ლოკალური ადმინი: ყოველთვის /api/proxy, რომ CORS არ დაირღვეს (localhost, 127.0.0.1, ::1). */
 function shouldUseAdminProxy(): boolean {
   if (typeof window === 'undefined') return false;
   const h = window.location.hostname;
