@@ -167,3 +167,17 @@ export function stationRowToForm(st: EvStationRow): EvStationFormState {
     sortOrder: st.sortOrder ?? 0,
   };
 }
+
+export type EvPromoRequestRow = {
+  id: string;
+  userId: string;
+  status: "pending" | "assigned";
+  promoCode?: string;
+  websiteUrl?: string;
+  userPhone?: string;
+  userName?: string;
+  requestedAt?: string;
+  assignedAt?: string;
+  assignedBy?: string;
+  notes?: string;
+};

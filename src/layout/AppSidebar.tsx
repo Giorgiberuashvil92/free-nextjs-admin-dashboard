@@ -117,6 +117,11 @@ const navItems: NavItem[] = [
     path: "/ev-charging",
   },
   {
+    icon: <PlugInIcon />,
+    name: "EV პრომო კოდები",
+    path: "/ev-promo-codes",
+  },
+  {
     icon: <PieChartIcon />,
     name: "მანქანების გაქირავება",
     path: "/car-rentals",
