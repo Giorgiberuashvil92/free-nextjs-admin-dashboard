@@ -15,6 +15,9 @@ import {
   type CarwashFormState,
   type CarwashRow,
 } from "@/components/carwash/carwashAdminTypes";
+import CarwashBusinessRequestsSection, {
+  type CarwashBusinessRequest,
+} from "@/components/carwash/CarwashBusinessRequestsSection";
 
 export default function CarwashesPage() {
   const [items, setItems] = useState<CarwashRow[]>([]);
@@ -69,6 +72,14 @@ export default function CarwashesPage() {
     setForm(emptyCarwashForm());
     setShowForm(true);
     setOk("");
+    setError("");
+  };
+
+  const openCreateFromRequest = (prefill: Partial<CarwashFormState>, _request: CarwashBusinessRequest) => {
+    setEditing(null);
+    setForm({ ...emptyCarwashForm(), ...prefill });
+    setShowForm(true);
+    setOk("განაცხადიდან ველები შეივსო — შეამოწმე და დაამატე");
     setError("");
   };
 
@@ -165,6 +176,8 @@ export default function CarwashesPage() {
       {ok ? (
         <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-700 text-sm">{ok}</div>
       ) : null}
+
+      <CarwashBusinessRequestsSection onCreateFromRequest={openCreateFromRequest} />
 
       <div className="border rounded-md p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <input
