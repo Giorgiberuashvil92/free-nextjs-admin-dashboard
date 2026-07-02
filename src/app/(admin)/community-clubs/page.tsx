@@ -4,10 +4,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_BASE, apiGet } from '@/lib/api';
 import {
   aggregateBrandsFromGarage,
+  allBrandKeysFromGarage,
   carsForBrand,
   clubsMatchingBrand,
   detectMakesFromClub,
+  findUniversalClubs,
   formatBrandLabel,
+  isUniversalClub,
   type BrandAggregate,
   type ClubRow,
   type GarageCarRow,
@@ -88,6 +91,8 @@ export default function CommunityClubsAdminPage() {
 
   const brands = useMemo(() => aggregateBrandsFromGarage(cars), [cars]);
 
+  const universalClubs = useMemo(() => findUniversalClubs(clubs), [clubs]);
+
   const selected = useMemo(
     () => brands.find((b) => b.key === selectedBrand) ?? null,
     [brands, selectedBrand],
@@ -109,10 +114,12 @@ export default function CommunityClubsAdminPage() {
     return clubs.filter((c) => !matchedIds.has(c.id));
   }, [clubs, matchedClubs, selectedBrand]);
 
-  const saveCarMakes = async (club: ClubRow, extraMake?: string) => {
+  const saveCarMakes = async (club: ClubRow, extraMake?: string, allMakes?: string[]) => {
     const raw = makesDraft[club.id] ?? '';
     let carMakes = parseCarMakesInput(raw);
-    if (extraMake && !carMakes.includes(extraMake)) {
+    if (allMakes?.length) {
+      carMakes = [...new Set([...carMakes, ...allMakes])];
+    } else if (extraMake && !carMakes.includes(extraMake)) {
       carMakes = [...carMakes, extraMake];
     }
     setSavingId(club.id);
@@ -120,7 +127,11 @@ export default function CommunityClubsAdminPage() {
       const res = await fetch(`${API_BASE}/community/groups/${club.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actorId: club.ownerId, carMakes }),
+        body: JSON.stringify({
+          actorId: club.ownerId,
+          carMakes,
+          isUniversal: isUniversalClub(club),
+        }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await loadAll();
@@ -171,6 +182,37 @@ export default function CommunityClubsAdminPage() {
     }
   };
 
+  const syncClubAllBrands = async (club: ClubRow) => {
+    const allKeys = allBrandKeysFromGarage(cars);
+    if (!allKeys.length) {
+      alert('გარაჟში ბრენდები ვერ მოიძებნა');
+      return;
+    }
+    setMakesDraft((p) => ({ ...p, [club.id]: allKeys.join(', ') }));
+    await saveCarMakes(club, undefined, allKeys);
+  };
+
+  const renderMakeTag = (m: string) => {
+    if (m === '*') {
+      return (
+        <span
+          key="all"
+          className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200"
+        >
+          ყველა ბრენდი
+        </span>
+      );
+    }
+    return (
+      <span
+        key={m}
+        className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700"
+      >
+        {formatBrandLabel(m)}
+      </span>
+    );
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6 pb-16">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -205,6 +247,40 @@ export default function CommunityClubsAdminPage() {
         />
       </div>
 
+      {/* PORTAL / MARTE — უნივერსალური კლუბები */}
+      {universalClubs.length > 0 ? (
+        <section className="space-y-3">
+          {universalClubs.map((club) => (
+            <div
+              key={club.id}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-5 text-white shadow-lg"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">{club.name}</h2>
+                  <p className="text-sm text-violet-100 mt-1 max-w-xl">
+                    ერთი კლუბი ყველა მარკისთვის — BMW, Toyota, Mercedes და სხვა ყველა
+                    ბრენდი ამ კლუბში უნდა შედიოდეს.
+                  </p>
+                  <p className="text-xs text-violet-200 mt-2">
+                    {club.membersCount ?? 0} წევრი · carMakes:{' '}
+                    {(club.carMakes || []).length} / {brands.length} ბრენდი
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void syncClubAllBrands(club)}
+                  disabled={savingId === club.id || !brands.length}
+                  className="text-sm px-4 py-2 bg-white text-violet-700 font-medium rounded-lg disabled:opacity-50 shrink-0"
+                >
+                  {savingId === club.id ? 'ინახება...' : 'ყველა ბრენდის მიბმა'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      ) : null}
+
       {/* ბრენდები */}
       <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
         <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
@@ -223,6 +299,9 @@ export default function CommunityClubsAdminPage() {
             {brands.map((b) => {
               const active = selectedBrand === b.key;
               const clubCount = clubsMatchingBrand(clubs, b.key).length;
+              const universalMatched = clubsMatchingBrand(clubs, b.key).filter((c) =>
+                isUniversalClub(c),
+              );
               return (
                 <button
                   key={b.key}
@@ -240,6 +319,9 @@ export default function CommunityClubsAdminPage() {
                   </div>
                   <div className="text-xs text-blue-600 dark:text-blue-400 mt-1 block">
                     {clubCount} შესაბამისი კლუბი
+                    {universalMatched.length
+                      ? ` · ${universalMatched.map((c) => c.name).join(', ')} ✓`
+                      : ''}
                   </div>
                 </button>
               );
@@ -305,20 +387,20 @@ export default function CommunityClubsAdminPage() {
                     className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 flex flex-col md:flex-row md:items-center gap-4"
                   >
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-900 dark:text-white">{club.name}</div>
+                      <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                        {club.name}
+                        {isUniversalClub(club) ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-100 text-violet-700">
+                            ყველა ბრენდი
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {club.membersCount ?? 0} წევრი · ქულა {club.matchScore}
                       </div>
                       <div className="text-xs text-gray-400 font-mono mt-1 break-all">{club.id}</div>
                       <div className="flex flex-wrap gap-1 mt-2">
-                        {detectMakesFromClub(club).map((m) => (
-                          <span
-                            key={m}
-                            className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700"
-                          >
-                            {formatBrandLabel(m)}
-                          </span>
-                        ))}
+                        {detectMakesFromClub(club).map((m) => renderMakeTag(m))}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 shrink-0">
@@ -452,7 +534,7 @@ export default function CommunityClubsAdminPage() {
                             key={m}
                             className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700"
                           >
-                            {formatBrandLabel(m)}
+                            {m === '*' ? 'ყველა' : formatBrandLabel(m)}
                           </span>
                         ))}
                       </div>

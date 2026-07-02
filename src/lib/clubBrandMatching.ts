@@ -24,7 +24,26 @@ export type ClubRow = {
   membersCount?: number;
   coverImage?: string;
   carMakes?: string[];
+  /** true = ყველა ბრენდისთვის (PORTAL, MARTE) */
+  isUniversal?: boolean;
 };
+
+/** PORTAL, MARTE — ერთი კლუბი ყველა მარკისთვის */
+export const UNIVERSAL_CLUB_MATCH_SCORE = 110;
+
+const UNIVERSAL_CLUB_NAME_RE = /^(portal|marte)$/i;
+
+export function isUniversalClub(club: Pick<ClubRow, 'name' | 'isUniversal'>): boolean {
+  if (club.isUniversal) return true;
+  const name = norm(club.name || '');
+  if (!name) return false;
+  if (UNIVERSAL_CLUB_NAME_RE.test(name.trim())) return true;
+  return name.includes('portal') || name.includes('marte');
+}
+
+export function findUniversalClubs(clubs: ClubRow[]): ClubRow[] {
+  return clubs.filter((c) => isUniversalClub(c));
+}
 
 const MAKE_ALIASES: Record<string, string[]> = {
   bmw: ['bmw'],
@@ -147,6 +166,7 @@ function clubHaystack(club: ClubRow): string {
 }
 
 function scoreClubForBrand(club: ClubRow, brandKey: string): number {
+  if (isUniversalClub(club)) return UNIVERSAL_CLUB_MATCH_SCORE;
   const aliases = MAKE_ALIASES[brandKey] ?? [brandKey];
   const hay = clubHaystack(club);
   const nameHay = norm(club.name || '');
@@ -189,6 +209,7 @@ export function carsForBrand(cars: GarageCarRow[], brandKey: string): GarageCarR
 }
 
 export function detectMakesFromClub(club: ClubRow): string[] {
+  if (isUniversalClub(club)) return ['*'];
   const found = new Set<string>();
   const hay = clubHaystack(club);
   for (const [key, aliases] of Object.entries(MAKE_ALIASES)) {
@@ -201,4 +222,9 @@ export function detectMakesFromClub(club: ClubRow): string[] {
     }
   }
   return [...found];
+}
+
+/** გარაჟიდან ყველა canonical ბრენდის key */
+export function allBrandKeysFromGarage(cars: GarageCarRow[]): string[] {
+  return aggregateBrandsFromGarage(cars).map((b) => b.key);
 }
