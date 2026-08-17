@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useLayoutEffect, useState, useCallback } from "react";
-import { apiGetJson, apiPatch } from "@/lib/api";
+import { apiGetJson, apiPatch, apiPost } from "@/lib/api";
 
 type DeviceTokenSummary = {
   _id?: string;
@@ -77,6 +77,7 @@ export default function UsersPage() {
   } | null>(null);
   const [loadingPlatformStats, setLoadingPlatformStats] = useState(false);
   const [deletingSubscriptionUserId, setDeletingSubscriptionUserId] = useState<string | null>(null);
+  const [grantingPremiumUserId, setGrantingPremiumUserId] = useState<string | null>(null);
 
   const getApiBase = () =>
     typeof window !== 'undefined' && window.location.hostname === 'localhost'
@@ -266,6 +267,65 @@ export default function UsersPage() {
       alert(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setDeletingSubscriptionUserId(null);
+    }
+  };
+
+  const handleGrantPremium = async (user: UserRow, currentSubscription?: { planId?: string; planName?: string; status?: string }) => {
+    const periodInput = prompt(
+      'Premium პერიოდი ჩაწერე: monthly, yearly ან lifetime',
+      'monthly',
+    )?.trim().toLowerCase();
+    if (!periodInput) return;
+
+    if (!['monthly', 'yearly', 'lifetime'].includes(periodInput)) {
+      alert('❌ პერიოდი უნდა იყოს monthly, yearly ან lifetime');
+      return;
+    }
+
+    const period = periodInput as 'monthly' | 'yearly' | 'lifetime';
+    const userLabel = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.phone || user.id;
+    const hasActivePremium =
+      currentSubscription?.status === 'active' &&
+      (currentSubscription.planId === 'premium' || currentSubscription.planName?.toLowerCase().includes('premium'));
+    const periodLabel = period === 'monthly' ? 'თვიური' : period === 'yearly' ? 'წლიური' : 'Lifetime';
+    const ok = confirm(
+      `${hasActivePremium ? 'Premium-ის განახლება' : 'Premium-ის მიცემა'} გსურთ?\n\nმომხმარებელი: ${userLabel}\nპერიოდი: ${periodLabel}`,
+    );
+    if (!ok) return;
+
+    setGrantingPremiumUserId(user.id);
+    try {
+      const subscription = await apiPost<any>('/subscriptions/grant-premium', {
+        userId: user.id,
+        phone: user.phone,
+        period,
+      });
+
+      if (subscription?.success === false) {
+        throw new Error(subscription.message || subscription.error || 'Premium grant failed');
+      }
+
+      setUserSubscriptions((prev) => ({
+        ...prev,
+        [user.id]: {
+          ...(prev[user.id] || {}),
+          ...(subscription || {}),
+          subscriptionId: subscription?.subscriptionId || subscription?._id || prev[user.id]?.subscriptionId,
+          userId: subscription?.userId || user.id,
+          planId: subscription?.planId || 'premium',
+          planName: subscription?.planName || 'პრემიუმ პაკეტი',
+          period: subscription?.period || period,
+          status: subscription?.status || 'active',
+          planPrice: subscription?.planPrice ?? 0,
+        },
+      }));
+      alert('✅ Premium წარმატებით მიენიჭა');
+      await load();
+    } catch (error) {
+      console.error('Error granting premium:', error);
+      alert(`❌ შეცდომა: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setGrantingPremiumUserId(null);
     }
   };
 
@@ -849,6 +909,23 @@ export default function UsersPage() {
                             )}
                             <button
                               type="button"
+                              onClick={() => void handleGrantPremium(u, subscription)}
+                              disabled={grantingPremiumUserId === u.id}
+                              className={`mt-1 px-2 py-0.5 text-xs rounded border transition-colors ${
+                                grantingPremiumUserId === u.id
+                                  ? 'bg-gray-200 text-gray-500 border-gray-300 cursor-not-allowed'
+                                  : 'text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-300 dark:border-purple-700 dark:hover:bg-purple-900/20'
+                              }`}
+                              title="Premium პაკეტის ხელით მინიჭება ან განახლება"
+                            >
+                              {grantingPremiumUserId === u.id
+                                ? 'ენიჭება…'
+                                : isPremium
+                                  ? '🎁 Premium განახლება'
+                                  : '🎁 Premium მიცემა'}
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => void handleDeleteSubscription(u.id, subscription)}
                               disabled={deletingSubscriptionUserId === u.id}
                               className={`mt-1 px-2 py-0.5 text-xs rounded border transition-colors ${
@@ -864,9 +941,24 @@ export default function UsersPage() {
                         );
                       }
                       return (
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400">
-                          Free
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-400">
+                            Free
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void handleGrantPremium(u)}
+                            disabled={grantingPremiumUserId === u.id}
+                            className={`px-2 py-0.5 text-xs rounded border transition-colors ${
+                              grantingPremiumUserId === u.id
+                                ? 'bg-gray-200 text-gray-500 border-gray-300 cursor-not-allowed'
+                                : 'text-purple-700 border-purple-300 hover:bg-purple-50 dark:text-purple-300 dark:border-purple-700 dark:hover:bg-purple-900/20'
+                            }`}
+                            title="Premium პაკეტის ხელით მინიჭება"
+                          >
+                            {grantingPremiumUserId === u.id ? 'ენიჭება…' : '🎁 Premium მიცემა'}
+                          </button>
+                        </div>
                       );
                     })()}
                   </td>
@@ -1300,5 +1392,3 @@ export default function UsersPage() {
     </div>
   );
 }
-
-

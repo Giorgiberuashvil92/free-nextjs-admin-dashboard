@@ -24,11 +24,9 @@ export type ClubRow = {
   membersCount?: number;
   coverImage?: string;
   carMakes?: string[];
-  /** true = ყველა ბრენდისთვის (PORTAL, MARTE) */
   isUniversal?: boolean;
 };
 
-/** PORTAL, MARTE — ერთი კლუბი ყველა მარკისთვის */
 export const UNIVERSAL_CLUB_MATCH_SCORE = 110;
 
 const UNIVERSAL_CLUB_NAME_RE = /^(portal|marte)$/i;

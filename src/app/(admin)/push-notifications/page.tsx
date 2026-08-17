@@ -257,6 +257,7 @@ export default function PushNotificationsPage() {
   const [finesActionLoading, setFinesActionLoading] = useState(false);
   const [unpaidUsers, setUnpaidUsers] = useState<UnpaidUserRow[]>([]);
   const [syncAllLoading, setSyncAllLoading] = useState(false);
+  const [protocolCronLoading, setProtocolCronLoading] = useState(false);
   const [manualTitle, setManualTitle] = useState('🚨 ჯარიმების შეხსენება');
   const [manualBody, setManualBody] = useState('გადაამოწმე ახალი ჯარიმები აპში — შესაძლოა გაქვს გადასახდელი ჩანაწერები.');
   const [deleteSaId, setDeleteSaId] = useState('');
@@ -599,6 +600,30 @@ export default function PushNotificationsPage() {
     }
   };
 
+  const handleRefreshProtocolFinesNow = async () => {
+    setProtocolCronLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/fines/protocol-fines/refresh-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.message || `HTTP error: ${res.status}`);
+      }
+      const result = await res.json();
+      alert(
+        `✅ Protocols.ge refresh მოინიშნა: marked=${result.marked ?? 0}, total=${result.total ?? 0}`,
+      );
+      await loadUnpaidUsersFromCache().catch(() => undefined);
+    } catch (error) {
+      console.error('Error refreshing Protocols.ge fines:', error);
+      alert(`❌ Protocols.ge refresh ვერ მოინიშნა: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setProtocolCronLoading(false);
+    }
+  };
+
   const handleSendOneTextToAllUnpaid = async () => {
     if (!manualTitle.trim() || !manualBody.trim()) {
       alert('შეავსე title და ტექსტი');
@@ -861,6 +886,23 @@ export default function PushNotificationsPage() {
         ) : null}
 
         <div className="border-t border-gray-200 pt-4 space-y-3">
+          <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <div className="font-semibold text-violet-950">Protocols.ge cron</div>
+              <div className="text-sm text-violet-700">
+                ხელით მონიშნავს tracked მანქანებს refresh-ისთვის; რეალური განახლება აპში WebView sync-ით გაეშვება.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefreshProtocolFinesNow}
+              disabled={protocolCronLoading}
+              className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm disabled:opacity-50"
+            >
+              {protocolCronLoading ? 'მოწმდება...' : 'Protocols Cron Now'}
+            </button>
+          </div>
+
           <div className="flex items-center justify-between flex-wrap gap-2">
             <h3 className="font-semibold text-gray-900">ყველა unpaid იუზერი (cache-იდან)</h3>
             <button
