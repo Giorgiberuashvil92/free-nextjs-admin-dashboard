@@ -83,6 +83,8 @@ export default function FinesVehiclesPage() {
   const [showNonPremiumMonitoredOnly, setShowNonPremiumMonitoredOnly] =
     useState(true);
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [deleteSaId, setDeleteSaId] = useState('');
+  const [deletingSaId, setDeletingSaId] = useState<number | null>(null);
   const [actionMessage, setActionMessage] = useState<{
     type: 'success' | 'error';
     text: string;
@@ -272,6 +274,48 @@ export default function FinesVehiclesPage() {
     }
   };
 
+  const handleDeleteVehicleBySaId = async (saVehicleId?: number) => {
+    const id = saVehicleId ?? Number(deleteSaId);
+    if (!Number.isFinite(id) || id <= 0) {
+      setActionMessage({
+        type: 'error',
+        text: 'შეიყვანე სწორი SA ID',
+      });
+      return;
+    }
+
+    if (!confirm(`ნამდვილად გსურს SA ID ${id}-ის წაშლა ჯარიმებიდან?`)) {
+      return;
+    }
+
+    setDeletingSaId(id);
+    setActionMessage(null);
+    try {
+      const base = getClientApiBase();
+      const response = await fetch(`${base}/fines/vehicles/sa/${id}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || result.error || `HTTP error: ${response.status}`);
+      }
+
+      setActionMessage({
+        type: 'success',
+        text: `SA ID ${id} წაიშალა. SA delete: ${result.saDeleted ? 'კი' : 'არა'}, DB deactivated: ${result.dbDeactivated}, Subs cancelled: ${result.subscriptionsCancelled}`,
+      });
+      setDeleteSaId('');
+      await load();
+    } catch (e: unknown) {
+      setActionMessage({
+        type: 'error',
+        text: (e as Error)?.message || 'SA ID-ით წაშლა ვერ შესრულდა',
+      });
+    } finally {
+      setDeletingSaId(null);
+    }
+  };
+
   const filteredVehicles = vehicles.filter((vehicle) => {
     if (showNonPremiumMonitoredOnly) {
       if (!vehicle.isActive) return false;
@@ -377,6 +421,35 @@ export default function FinesVehiclesPage() {
           {actionMessage.text}
         </div>
       )}
+
+      <div className="mb-6 bg-white border border-red-100 rounded-lg p-4">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-3">
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-gray-800 mb-1">
+              ჯარიმებიდან მანქანის წაშლა
+            </label>
+            <input
+              type="number"
+              value={deleteSaId}
+              onChange={(e) => setDeleteSaId(e.target.value)}
+              placeholder="SA ID წასაშლელად"
+              className="w-full border border-red-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void handleDeleteVehicleBySaId()}
+            disabled={deletingSaId !== null}
+            className={`px-4 py-2 rounded-md text-sm font-medium text-white ${
+              deletingSaId !== null
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-red-600 hover:bg-red-700'
+            }`}
+          >
+            {deletingSaId !== null ? 'იშლება...' : 'SA ID-ით წაშლა'}
+          </button>
+        </div>
+      </div>
 
       {/* SA აქტივი + ვის დაამატა */}
       <div className="mb-8">
@@ -607,6 +680,18 @@ export default function FinesVehiclesPage() {
                       >
                         იუზერი
                       </a>
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteVehicleBySaId(vehicle.saVehicleId)}
+                        disabled={deletingSaId === vehicle.saVehicleId}
+                        className={`px-3 py-1.5 rounded text-xs font-medium text-white ${
+                          deletingSaId === vehicle.saVehicleId
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-red-600 hover:bg-red-700'
+                        }`}
+                      >
+                        {deletingSaId === vehicle.saVehicleId ? 'იშლება...' : 'SA წაშლა'}
+                      </button>
                     </div>
                   </td>
                 </tr>
