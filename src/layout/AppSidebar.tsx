@@ -88,6 +88,7 @@ const navItems: NavItem[] = [
       { name: "მიტანის მოთხოვნები", path: "/delivery-leads" },
       { name: "დაზღვევის მოთხოვნები", path: "/insurance-leads" },
       { name: "ექსკლუზიური შეთავაზება", path: "/exclusive-offer-requests" },
+      { name: "ქეშბექის ინვოისები", path: "/cashback" },
       { name: "შეხსენებები & შეთავაზებები", path: "/reminders-offers" },
       { name: "ოფერების მართვა", path: "/offers-admin" },
     ],
