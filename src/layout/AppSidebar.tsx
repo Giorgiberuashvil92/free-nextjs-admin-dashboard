@@ -86,6 +86,7 @@ const navItems: NavItem[] = [
       { name: "Ecommerce Shop", path: "/ecommerce-products" },
       { name: "მიტანის პროდუქტები", path: "/delivery-products" },
       { name: "მიტანის მოთხოვნები", path: "/delivery-leads" },
+      { name: "დაზღვევის მოთხოვნები", path: "/insurance-leads" },
       { name: "ექსკლუზიური შეთავაზება", path: "/exclusive-offer-requests" },
       { name: "შეხსენებები & შეთავაზებები", path: "/reminders-offers" },
       { name: "ოფერების მართვა", path: "/offers-admin" },
