@@ -26,8 +26,7 @@ type CarwashDetail = {
   timeSlotsConfig?: TimeSlotsConfig;
 };
 
-const CLOUDINARY_URL = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_URL || "";
-const CLOUDINARY_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "";
+const R2_UPLOAD_URL = `${API_BASE}/uploads/images`;
 
 export default function CarwashDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -205,17 +204,18 @@ export default function CarwashDetailPage() {
             Upload
             <input type="file" multiple accept="image/*" className="hidden" onChange={async (e)=>{
               const files = Array.from(e.target.files||[]);
-              if (!files.length || !CLOUDINARY_URL || !CLOUDINARY_PRESET) return;
+              if (!files.length) return;
               setUploading(true);
               try {
                 const uploaded: string[] = [];
                 for (const file of files) {
                   const fd = new FormData();
                   fd.append('file', file);
-                  fd.append('upload_preset', CLOUDINARY_PRESET);
-                  const r = await fetch(CLOUDINARY_URL, { method:'POST', body: fd });
+                  fd.append('folder', 'carappx/carwashes');
+                  const r = await fetch(R2_UPLOAD_URL, { method:'POST', body: fd });
                   const j = await r.json();
-                  if (j?.secure_url) uploaded.push(j.secure_url as string);
+                  const url = j?.data?.url || j?.url || j?.secure_url;
+                  if (url) uploaded.push(url as string);
                 }
                 const images = [...(data.images||[]), ...uploaded];
                 setData(prev=> prev? ({...prev, images}) : prev);
@@ -242,5 +242,4 @@ export default function CarwashDetailPage() {
     </div>
   );
 }
-
 

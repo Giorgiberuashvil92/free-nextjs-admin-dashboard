@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { apiGetJson } from '@/lib/api';
 
 // Helper functions საქართველოს დროს (Asia/Tbilisi, UTC+4)
@@ -59,6 +59,13 @@ interface LoginHistory {
   createdAt: string;
 }
 
+interface Subscription {
+  userId?: string;
+  planId?: string;
+  planName?: string;
+  status?: string;
+}
+
 interface UniqueUser {
   userId: string;
   phone: string;
@@ -81,6 +88,7 @@ export default function TodayLoginsPage() {
   const [todayLogins, setTodayLogins] = useState<LoginHistory[]>([]);
   const [yesterdayLogins, setYesterdayLogins] = useState<LoginHistory[]>([]);
   const [weekLogins, setWeekLogins] = useState<LoginHistory[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [todayStats, setTodayStats] = useState<{ logins: number; uniqueUsers: number; successfulLogins: number; failedLogins: number }>({
     logins: 0,
@@ -106,6 +114,21 @@ export default function TodayLoginsPage() {
     phone: '',
     status: '' as 'success' | 'failed' | '',
   });
+
+  const premiumUserIds = useMemo(() => {
+    return new Set(
+      subscriptions
+        .filter((subscription) => {
+          const status = (subscription.status || '').toLowerCase().trim();
+          const plan = `${subscription.planId || ''} ${subscription.planName || ''}`.toLowerCase();
+          return ['active', 'trial', 'trialing'].includes(status) && plan.includes('premium');
+        })
+        .map((subscription) => String(subscription.userId || ''))
+        .filter(Boolean),
+    );
+  }, [subscriptions]);
+
+  const isPremiumUser = (userId: string) => premiumUserIds.has(userId);
 
   const getGeorgiaWeekStart = (): Date => {
     const today = getGeorgiaTodayStart();
@@ -141,12 +164,20 @@ export default function TodayLoginsPage() {
       const weekStart = getGeorgiaWeekStart();
       params.append('startDate', weekStart.toISOString());
 
-      const response = await apiGetJson<{
+      const [response, subscriptionsResponse] = await Promise.all([
+        apiGetJson<{
         success: boolean;
         data: LoginHistory[];
         total: number;
         message: string;
-      }>(`/login-history?${params.toString()}`);
+        }>(`/login-history?${params.toString()}`),
+        apiGetJson<Subscription[] | { data?: Subscription[] }>(`/subscriptions?t=${Date.now()}`).catch(() => null),
+      ]);
+
+      const loadedSubscriptions = Array.isArray(subscriptionsResponse)
+        ? subscriptionsResponse
+        : (subscriptionsResponse?.data || []);
+      setSubscriptions(loadedSubscriptions);
 
       if (response.success && response.data) {
         // დღევანდელი შესვლები
@@ -281,9 +312,10 @@ export default function TodayLoginsPage() {
         }
         setWeekStats(dailyStats);
       } else {
-        setTodayLogins([]);
-        setYesterdayLogins([]);
-        setWeekLogins([]);
+      setTodayLogins([]);
+      setYesterdayLogins([]);
+      setWeekLogins([]);
+      setSubscriptions([]);
         setWeekStats([]);
       }
     } catch (error) {
@@ -292,6 +324,7 @@ export default function TodayLoginsPage() {
       setYesterdayLogins([]);
         setWeekLogins([]);
         setWeekStats([]);
+      setSubscriptions([]);
     } finally {
       setLoading(false);
     }
@@ -602,6 +635,9 @@ export default function TodayLoginsPage() {
                     ტელეფონი
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    გამოწერა
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     ბოლო შესვლა
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -632,6 +668,15 @@ export default function TodayLoginsPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {user.phone}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          isPremiumUser(user.userId)
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        }`}>
+                          {isPremiumUser(user.userId) ? '💎 Premium' : 'არა Premium'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {formatDate(lastLogin.loginAt)}
@@ -714,6 +759,13 @@ export default function TodayLoginsPage() {
                         <div className="text-sm text-gray-600 dark:text-gray-400">
                           {user.phone} • {user.userId}
                         </div>
+                        <span className={`inline-block mt-2 px-2 py-1 text-xs font-semibold rounded-full ${
+                          isPremiumUser(user.userId)
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                        }`}>
+                          {isPremiumUser(user.userId) ? '💎 Premium' : 'არა Premium'}
+                        </span>
                       </div>
                       <div className="text-right">
                         <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
@@ -837,6 +889,9 @@ export default function TodayLoginsPage() {
                       ტელეფონი
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      გამოწერა
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       დრო
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -861,6 +916,15 @@ export default function TodayLoginsPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         {item.phone}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          isPremiumUser(item.userId)
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        }`}>
+                          {isPremiumUser(item.userId) ? '💎 Premium' : 'არა Premium'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {formatDate(item.loginAt)}

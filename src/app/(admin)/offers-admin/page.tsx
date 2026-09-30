@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { API_BASE, apiDelete, apiGetJson, apiPatch, apiPost } from "@/lib/api";
 
 type StoreLite = {
   id: string;
   title?: string;
   name?: string;
+  businessType?: string;
+  managePath?: string;
 };
 
 type SpecialOffer = {
   id: string;
-  storeId: string;
+  _id?: string;
+  storeId?: string;
+  sourceType?: "store" | "feature";
+  sourceLabel?: string;
+  sourcePath?: string;
   title?: string;
   description?: string;
   oldPrice: string;
@@ -19,15 +26,20 @@ type SpecialOffer = {
   discount: string;
   image?: string;
   isActive: boolean;
+  featuredOnHome?: boolean;
+  priority?: number;
 };
 
 type OfferForm = {
+  sourceType: "store" | "feature";
+  sourceLabel: string;
+  sourcePath: string;
   storeId: string;
   title: string;
   subtitle: string;
   partnerName: string;
   description: string;
-  category: "fuel" | "fines" | "services" | "insurance" | "parts" | "other";
+  category: string;
   route: string;
   icon: string;
   badge: string;
@@ -40,12 +52,13 @@ type OfferForm = {
   discount: string;
   image: string;
   isActive: boolean;
+  priority: string;
 };
 
 type PremiumMeta = {
   subtitle?: string;
   partnerName?: string;
-  category?: OfferForm["category"];
+  category?: string;
   route?: string;
   icon?: string;
   badge?: string;
@@ -58,7 +71,7 @@ type PremiumMeta = {
 const PREMIUM_META_START = "[premium_meta]";
 const PREMIUM_META_END = "[/premium_meta]";
 
-const CATEGORY_OPTIONS: Array<{ value: OfferForm["category"]; label: string }> = [
+const CATEGORY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "fuel", label: "საწვავი" },
   { value: "fines", label: "ჯარიმები" },
   { value: "services", label: "სერვისები" },
@@ -103,6 +116,9 @@ function buildPremiumMetaDescription(form: OfferForm): string {
 }
 
 const EMPTY_FORM: OfferForm = {
+  sourceType: "store",
+  sourceLabel: "",
+  sourcePath: "/stores",
   storeId: "",
   title: "",
   subtitle: "",
@@ -121,6 +137,7 @@ const EMPTY_FORM: OfferForm = {
   discount: "",
   image: "",
   isActive: true,
+  priority: "0",
 };
 
 export default function OffersAdminPage() {
@@ -131,6 +148,7 @@ export default function OffersAdminPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [selectedStore, setSelectedStore] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [editingOffer, setEditingOffer] = useState<SpecialOffer | null>(null);
   const [form, setForm] = useState<OfferForm>(EMPTY_FORM);
 
@@ -138,13 +156,33 @@ export default function OffersAdminPage() {
     setLoading(true);
     setError("");
     try {
-      const storesRes = await apiGetJson<any>("/stores?limit=500");
-      const storesList = Array.isArray(storesRes)
-        ? storesRes
-        : Array.isArray(storesRes?.data)
-          ? storesRes.data
-          : [];
-      setStores(storesList);
+      const sourceResponses = await Promise.allSettled([
+        apiGetJson<any>("/stores?limit=500"),
+        apiGetJson<any>("/detailing?includeAll=true"),
+        apiGetJson<any>("/interior?includeAll=true"),
+        apiGetJson<any>("/dismantlers?limit=500"),
+      ]);
+      const sourceDefinitions = [
+        { label: "მაღაზია", path: "/stores" },
+        { label: "დითეილინგი", path: "/detailing" },
+        { label: "ინტერიერი", path: "/interior" },
+        { label: "დაშლილები", path: "/dismantlers" },
+      ];
+      const sources = sourceResponses.flatMap((result, index) => {
+        if (result.status !== "fulfilled") return [];
+        const body = result.value;
+        const list = Array.isArray(body) ? body : Array.isArray(body?.data) ? body.data : [];
+        return list
+          .map((source: any) => ({
+            ...source,
+            id: source.id || source._id,
+            businessType: sourceDefinitions[index].label,
+            managePath: sourceDefinitions[index].path,
+          }))
+          .filter((source: StoreLite) => Boolean(source.id));
+      });
+      const uniqueSources = Array.from(new Map(sources.map((source) => [`${source.managePath}:${source.id}`, source])).values());
+      setStores(uniqueSources);
 
       const offersRes = await fetch(`${API_BASE}/special-offers?activeOnly=false`, {
         method: "GET",
@@ -155,7 +193,15 @@ export default function OffersAdminPage() {
       if (!offersRes.ok) {
         throw new Error(offersJson?.message || "ოფერების წამოღება ვერ მოხერხდა");
       }
-      setOffers(Array.isArray(offersJson?.data) ? offersJson.data : []);
+      const rawOffers = Array.isArray(offersJson?.data) ? offersJson.data : [];
+      setOffers(
+        rawOffers
+          .map((offer: SpecialOffer) => ({
+            ...offer,
+            id: offer.id || offer._id || "",
+          }))
+          .filter((offer: SpecialOffer) => Boolean(offer.id)),
+      );
     } catch (e: any) {
       setError(e?.message || "მონაცემების წამოღება ვერ მოხერხდა");
     } finally {
@@ -172,6 +218,9 @@ export default function OffersAdminPage() {
     if (selectedStore !== "all") {
       list = list.filter((o) => o.storeId === selectedStore);
     }
+    if (selectedCategory !== "all") {
+      list = list.filter((o) => parsePremiumMeta(o.description || "").meta.category === selectedCategory);
+    }
     const term = query.trim().toLowerCase();
     if (!term) return list;
     return list.filter((o) =>
@@ -179,12 +228,25 @@ export default function OffersAdminPage() {
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(term)),
     );
-  }, [offers, query, selectedStore]);
+  }, [offers, query, selectedStore, selectedCategory]);
 
-  const storeName = (storeId: string) => {
+  const storeName = (storeId?: string) => {
+    if (!storeId) return "აპის ფუნქცია";
     const s = stores.find((x) => x.id === storeId);
     return s?.title || s?.name || storeId;
   };
+
+  const storeOfferStats = useMemo(() => {
+    return stores.map((store) => {
+      const storeOffers = offers.filter((offer) => offer.storeId === store.id);
+      return {
+        ...store,
+        total: storeOffers.length,
+        active: storeOffers.filter((offer) => offer.isActive).length,
+        home: storeOffers.filter((offer) => offer.isActive && offer.featuredOnHome !== false).length,
+      };
+    });
+  }, [offers, stores]);
 
   const resetForm = () => {
     setEditingOffer(null);
@@ -195,6 +257,9 @@ export default function OffersAdminPage() {
     const { meta, description } = parsePremiumMeta(offer.description || "");
     setEditingOffer(offer);
     setForm({
+      sourceType: offer.sourceType || (offer.storeId ? "store" : "feature"),
+      sourceLabel: offer.sourceLabel || "",
+      sourcePath: offer.sourcePath || "/stores",
       storeId: offer.storeId || "",
       title: offer.title || "",
       subtitle: meta.subtitle || "",
@@ -204,7 +269,7 @@ export default function OffersAdminPage() {
       route: meta.route || "",
       icon: meta.icon || "sparkles",
       badge: meta.badge || "",
-      featuredOnHome: meta.featuredOnHome ?? true,
+      featuredOnHome: meta.featuredOnHome ?? offer.featuredOnHome ?? true,
       iconColor: meta.iconColor || "",
       iconBg: meta.iconBg || "",
       logoSvg: meta.logoSvg || "",
@@ -213,20 +278,24 @@ export default function OffersAdminPage() {
       discount: offer.discount || "",
       image: offer.image || "",
       isActive: offer.isActive,
+      priority: String(offer.priority ?? 0),
     });
   };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.storeId || !form.oldPrice || !form.newPrice || !form.discount) {
-      setError("store, oldPrice, newPrice და discount სავალდებულოა");
+    if ((form.sourceType === "store" && !form.storeId) || (form.sourceType === "feature" && !form.sourceLabel.trim()) || !form.oldPrice || !form.newPrice || !form.discount) {
+      setError("წყარო, oldPrice, newPrice და discount სავალდებულოა");
       return;
     }
     setSaving(true);
     setError("");
     try {
       const payload = {
-        storeId: form.storeId,
+        storeId: form.sourceType === "store" ? form.storeId : undefined,
+        sourceType: form.sourceType,
+        sourceLabel: form.sourceType === "feature" ? form.sourceLabel.trim() : undefined,
+        sourcePath: form.sourceType === "store" ? form.sourcePath : undefined,
         title: form.title || undefined,
         description: buildPremiumMetaDescription(form),
         oldPrice: form.oldPrice,
@@ -234,6 +303,8 @@ export default function OffersAdminPage() {
         discount: form.discount,
         image: form.image || undefined,
         isActive: form.isActive,
+        featuredOnHome: form.featuredOnHome,
+        priority: Number.parseInt(form.priority, 10) || 0,
       };
       if (editingOffer?.id) {
         await apiPatch(`/special-offers/${editingOffer.id}`, payload);
@@ -269,15 +340,62 @@ export default function OffersAdminPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Premium შეთავაზებების მართვა</h1>
-        <p className="text-sm text-gray-500">მობაილის Premium შეთავაზებები — დამატება, დამალვა/გამოჩენა, პარტნიორების მართვა</p>
+    <div className="min-h-screen bg-slate-50 p-6 space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">MARTE · CONTENT</div>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">შეთავაზებების მართვა</h1>
+          <p className="mt-1 text-sm text-slate-500">აირჩიე კონკრეტული მაღაზია, მართე მისი შეთავაზებები და გადაწყვიტე რა გამოჩნდება მობაილის მთავარ გვერდზე.</p>
+        </div>
+        <Link href="/stores" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:border-indigo-300 hover:text-indigo-600">
+          ყველა მაღაზიის ნახვა →
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs text-slate-500">მაღაზიები</div>
+          <div className="mt-1 text-2xl font-semibold text-slate-950">{stores.length}</div>
+          <div className="mt-1 text-xs text-slate-400">შეთავაზებების მქონე პარტნიორები</div>
+        </div>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
+          <div className="text-xs text-emerald-700">აქტიური შეთავაზებები</div>
+          <div className="mt-1 text-2xl font-semibold text-emerald-800">{offers.filter((offer) => offer.isActive).length}</div>
+          <div className="mt-1 text-xs text-emerald-600">მომხმარებლებისთვის ხილული</div>
+        </div>
+        <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm">
+          <div className="text-xs text-indigo-700">მთავარ გვერდზე</div>
+          <div className="mt-1 text-2xl font-semibold text-indigo-800">{offers.filter((offer) => offer.isActive && offer.featuredOnHome !== false).length}</div>
+          <div className="mt-1 text-xs text-indigo-600">„შენთვის შერჩეული“ ბარათები</div>
+        </div>
       </div>
 
       {error && <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
 
-      <form onSubmit={onSubmit} className="rounded-md border p-4 space-y-4">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-end justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-slate-900">კონტენტის ტიპები</h2>
+            <p className="mt-1 text-xs text-slate-500">აქ იმართება არა მხოლოდ მაღაზიები — ნაწილები, დაშლილები, დაზღვევა, საწვავი, სერვისები და სხვა შეთავაზებები.</p>
+          </div>
+          <span className="hidden rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-500 sm:inline-flex">{storeOfferStats.length} პარტნიორი</span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => setSelectedCategory("all")} className={`rounded-full px-4 py-2 text-sm font-medium ${selectedCategory === "all" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+            ყველა
+          </button>
+          {CATEGORY_OPTIONS.map((category) => {
+            const categoryOffers = offers.filter((offer) => parsePremiumMeta(offer.description || "").meta.category === category.value);
+            return (
+              <button key={category.value} type="button" onClick={() => { setSelectedCategory(category.value); setSelectedStore("all"); }} className={`rounded-full px-4 py-2 text-sm font-medium ${selectedCategory === category.value ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                {category.label} <span className="ml-1 opacity-70">{categoryOffers.length}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-medium">{editingOffer ? "ოფერის რედაქტირება" : "ახალი ოფერი"}</h2>
           {editingOffer ? (
@@ -289,29 +407,54 @@ export default function OffersAdminPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <select
-            value={form.storeId}
-            onChange={(e) => setForm((p) => ({ ...p, storeId: e.target.value }))}
+            value={form.sourceType}
+            onChange={(e) => setForm((p) => ({ ...p, sourceType: e.target.value as OfferForm["sourceType"] }))}
             className="border rounded-md px-3 py-2"
-            required
           >
-            <option value="">აირჩიე მაღაზია</option>
-            {stores.map((s, idx) => (
-              <option key={`${s.id || s.title || s.name || "store"}-${idx}`} value={s.id}>
-                {s.title || s.name || s.id}
-              </option>
-            ))}
+            <option value="store">მაღაზია / პარტნიორი</option>
+            <option value="feature">აპის ფუნქცია / კატეგორია</option>
           </select>
-          <select
+          {form.sourceType === "store" ? (
+            <select
+              value={form.storeId}
+              onChange={(e) => {
+                const selected = stores.find((source) => source.id === e.target.value);
+                setForm((p) => ({
+                  ...p,
+                  storeId: e.target.value,
+                  sourceLabel: selected?.title || selected?.name || "",
+                  sourcePath: selected?.managePath || "/stores",
+                }));
+              }}
+              className="border rounded-md px-3 py-2"
+              required
+            >
+              <option value="">აირჩიე მაღაზია</option>
+              {stores.map((s, idx) => (
+                <option key={`${s.id || s.title || s.name || "store"}-${idx}`} value={s.id}>
+                {s.businessType ? `${s.businessType} · ` : ""}{s.title || s.name || s.id}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              value={form.sourceLabel}
+              onChange={(e) => setForm((p) => ({ ...p, sourceLabel: e.target.value }))}
+              className="border rounded-md px-3 py-2"
+              placeholder="ფუნქცია/კატეგორია (მაგ. დაშლილები, AI ასისტენტი)"
+              required
+            />
+          )}
+          <input
             value={form.category}
-            onChange={(e) => setForm((p) => ({ ...p, category: e.target.value as OfferForm["category"] }))}
+            onChange={(e) => setForm((p) => ({ ...p, category: e.target.value }))}
             className="border rounded-md px-3 py-2"
-          >
-            {CATEGORY_OPTIONS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+            list="offer-category-options"
+            placeholder="კატეგორია (შეგიძლია ახალი ჩაწერო)"
+          />
+          <datalist id="offer-category-options">
+            {CATEGORY_OPTIONS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+          </datalist>
           <input
             value={form.partnerName}
             onChange={(e) => setForm((p) => ({ ...p, partnerName: e.target.value }))}
@@ -376,6 +519,13 @@ export default function OffersAdminPage() {
             placeholder="სურათის URL"
           />
           <input
+            value={form.priority}
+            onChange={(e) => setForm((p) => ({ ...p, priority: e.target.value }))}
+            className="border rounded-md px-3 py-2"
+            type="number"
+            placeholder="რიგი (დიდი რიცხვი = წინ)"
+          />
+          <input
             value={form.iconColor}
             onChange={(e) => setForm((p) => ({ ...p, iconColor: e.target.value }))}
             className="border rounded-md px-3 py-2"
@@ -433,7 +583,7 @@ export default function OffersAdminPage() {
         </div>
       </form>
 
-      <div className="rounded-md border p-4 space-y-3">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
         <div className="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
           <h2 className="font-medium">ოფერების სია ({filteredOffers.length})</h2>
           <div className="flex gap-2">
@@ -442,10 +592,10 @@ export default function OffersAdminPage() {
               onChange={(e) => setSelectedStore(e.target.value)}
               className="border rounded-md px-3 py-2"
             >
-              <option value="all">ყველა მაღაზია</option>
+              <option value="all">ყველა პარტნიორი/მაღაზია</option>
               {stores.map((s, idx) => (
                 <option key={`${s.id || s.title || s.name || "store-filter"}-${idx}`} value={s.id}>
-                  {s.title || s.name || s.id}
+                  {s.businessType ? `${s.businessType} · ` : ""}{s.title || s.name || s.id}
                 </option>
               ))}
             </select>
@@ -477,7 +627,16 @@ export default function OffersAdminPage() {
               <tbody>
                 {filteredOffers.map((o) => (
                   <tr key={o.id} className="border-t">
-                    <td className="px-3 py-2">{storeName(o.storeId)}</td>
+                    <td className="px-3 py-2">
+                      {o.storeId ? (
+                        <Link href={`${o.sourcePath || "/stores"}/${o.storeId}`} className="font-medium text-indigo-600 hover:underline">
+                          {storeName(o.storeId)}
+                        </Link>
+                      ) : (
+                        <div className="font-medium text-slate-700">{o.sourceLabel || "აპის ფუნქცია"}</div>
+                      )}
+                      <div className="text-xs text-slate-400">{o.storeId || o.sourceType || "feature"}</div>
+                    </td>
                     <td className="px-3 py-2">
                       {(() => {
                         const { meta, description } = parsePremiumMeta(o.description || "");
@@ -530,4 +689,3 @@ export default function OffersAdminPage() {
     </div>
   );
 }
-

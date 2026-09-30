@@ -1,8 +1,23 @@
-const CLOUDINARY_CLOUD_NAME =
-  process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dtj9xx4qu";
-const CLOUDINARY_UPLOAD_PRESET =
-  process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "carxapp";
-const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+function resolveUploadBackendUrl(): string {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "[::1]" ||
+      host === "::1"
+    ) {
+      return (
+        process.env.NEXT_PUBLIC_LOCAL_BACKEND_URL || "http://127.0.0.1:3002"
+      );
+    }
+  }
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "https://marte-backend-production.up.railway.app"
+  );
+}
 
 export async function uploadImageToCloudinary(
   file: File,
@@ -10,18 +25,24 @@ export async function uploadImageToCloudinary(
 ): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
   if (folder) formData.append("folder", folder);
-  formData.append("tags", "carappx,admin,ev-charging");
 
-  const response = await fetch(CLOUDINARY_UPLOAD_URL, {
-    method: "POST",
-    body: formData,
-  });
+  const response = await fetch(
+    `${resolveUploadBackendUrl()}/uploads/images`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
   if (!response.ok) {
     throw new Error(`ატვირთვა ვერ მოხერხდა: ${response.statusText}`);
   }
-  const result = (await response.json()) as { secure_url?: string };
-  if (!result.secure_url) throw new Error("URL არ მივიღეთ");
-  return result.secure_url;
+  const result = (await response.json()) as {
+    data?: { url?: string };
+    url?: string;
+    secure_url?: string;
+  };
+  const url = result.data?.url || result.url || result.secure_url;
+  if (!url) throw new Error("URL არ მივიღეთ");
+  return url;
 }

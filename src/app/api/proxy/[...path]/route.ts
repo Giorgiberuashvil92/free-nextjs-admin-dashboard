@@ -85,14 +85,22 @@ async function handleRequest(
 
     console.log(`[PROXY] ${method} ${path} -> ${backendUrl}`);
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
+    const incomingContentType = request.headers.get('content-type') || '';
+    const isMultipart = incomingContentType.includes('multipart/form-data');
+
+    const headers: HeadersInit = {};
 
     // Forward any custom headers if needed
     const authHeader = request.headers.get('authorization');
     if (authHeader) {
       headers['authorization'] = authHeader;
+    }
+
+    // Keep original multipart Content-Type (incl. boundary). JSON only for non-files.
+    if (isMultipart) {
+      headers['Content-Type'] = incomingContentType;
+    } else if (method !== 'GET' && method !== 'HEAD') {
+      headers['Content-Type'] = incomingContentType || 'application/json';
     }
 
     const options: RequestInit = {
@@ -101,9 +109,14 @@ async function handleRequest(
     };
 
     if (method !== 'GET' && method !== 'HEAD') {
-      const body = await request.text();
-      if (body) {
-        options.body = body;
+      if (isMultipart) {
+        // Preserve binary body + multipart boundary for uploads
+        options.body = Buffer.from(await request.arrayBuffer());
+      } else {
+        const body = await request.text();
+        if (body) {
+          options.body = body;
+        }
       }
     }
 

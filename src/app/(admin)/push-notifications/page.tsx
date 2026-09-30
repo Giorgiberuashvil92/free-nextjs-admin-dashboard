@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { apiGetJson, API_BASE } from '@/lib/api';
 import {
@@ -8,37 +8,8 @@ import {
   COMMUNITY_PUSH_META,
   type CommunityPushKind,
 } from '@/lib/communityPush';
-import {
-  type ResolvedUserRow,
-  resolvedDisplayName,
-  resolveUsersInParallel,
-} from '@/lib/resolveUserProfile';
 
 /** Types **/
-type ConsentStatus = 'granted' | 'denied' | 'blocked' | 'snoozed' | 'never';
-type ConsentItem = {
-  userId: string;
-  phone?: string;
-  name?: string;
-  status: ConsentStatus;
-  platform?: 'ios' | 'android';
-  updatedAt?: string;
-  tokenPrefix?: string;
-  deviceName?: string;
-  modelName?: string;
-  appVersion?: string;
-};
-type ConsentSummary = {
-  totalUsers: number;
-  totalDevices: number;
-  granted: number;
-  denied: number;
-  blocked: number;
-  snoozed: number;
-  never: number;
-};
-type ConsentResponse = { summary: ConsentSummary; items: ConsentItem[] };
-
 type SendToType = 'active' | 'role' | 'userIds';
 type NotificationType =
   | 'general'
@@ -81,31 +52,37 @@ type UnpaidUserRow = {
   activeVehicles: number;
 };
 
-/** Config **/
-const STATUS_LABELS: Record<ConsentStatus, string> = {
-  granted: 'ჩართული',
-  denied: 'უარი',
-  blocked: 'დაბლოკილი (OS)',
-  snoozed: 'მოგვიანებით',
-  never: 'აღარ მაჩვენო',
-};
-const STATUS_COLORS: Record<ConsentStatus, string> = {
-  granted: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
-  denied: 'bg-rose-100 text-rose-800 border border-rose-200',
-  blocked: 'bg-amber-100 text-amber-800 border border-amber-200',
-  snoozed: 'bg-blue-100 text-blue-800 border border-blue-200',
-  never: 'bg-gray-100 text-gray-700 border border-gray-200',
-};
-const STATUS_FILTERS: Array<{ value: ConsentStatus | 'all'; label: string }> = [
-  { value: 'all', label: 'ყველა' },
-  { value: 'granted', label: 'ჩართული' },
-  { value: 'denied', label: 'უარი' },
-  { value: 'blocked', label: 'დაბლოკილი (OS)' },
-  { value: 'snoozed', label: 'მოგვიანებით' },
-  { value: 'never', label: 'აღარ მაჩვენო' },
-];
-
 type NotificationTypeConfig = { type: NotificationType; label: string; screen: string; icon: string; description: string };
+const MOBILE_DESTINATIONS = [
+  { key: 'home', label: 'მთავარი გვერდი', route: '/' },
+  { key: 'notifications', label: 'შეტყობინებები', route: '/notifications' },
+  { key: 'ai-dashboard', label: 'AI ასისტენტი', route: '/ai-dashboard-demo' },
+  { key: 'ai-chat', label: 'AI ჩატი', route: '/ai-chat' },
+  { key: 'categories', label: 'კატეგორიები', route: '/(tabs)/marketplace' },
+  { key: 'marte', label: 'მართე', route: '/(tabs)/ecommerce' },
+  { key: 'offers', label: 'შეთავაზებები', route: '/offers' },
+  { key: 'offer-detail', label: 'კონკრეტული შეთავაზება', route: '/offers/{offerId}' },
+  { key: 'fuel', label: 'საწვავის ფასები', route: '/fuel-stations' },
+  { key: 'insurance', label: 'დაზღვევა', route: '/insurance' },
+  { key: 'financing-info', label: 'განვადების ინფორმაცია', route: '/financing-info' },
+  { key: 'financing-request', label: 'განვადების მოთხოვნა', route: '/financing-request' },
+  { key: 'marte-card', label: 'Marte Card', route: '/marte-card' },
+  { key: 'garage', label: 'Garage / მანქანები', route: '/(tabs)/garage' },
+  { key: 'garage-activity', label: 'მძღოლების აქტივობა', route: '/garage-activity' },
+  { key: 'radars', label: 'რადარები', route: '/radars' },
+  { key: 'carfax', label: 'Carfax', route: '/carfax' },
+  { key: 'review', label: 'შეფასება', route: '/review' },
+  { key: 'community', label: 'Community', route: '/(tabs)/community' },
+  { key: 'comments', label: 'პოსტის კომენტარები', route: '/comments' },
+  { key: 'groups', label: 'კლუბები', route: '/groups' },
+  { key: 'group-detail', label: 'კონკრეტული კლუბი', route: '/groups/{groupId}' },
+  { key: 'profile', label: 'მომხმარებლის პროფილი', route: '/profile/{userId}' },
+  { key: 'chat', label: 'ჩატი', route: '/chats' },
+  { key: 'support-chat', label: 'საპორტის ჩატი', route: '/support-chat/conversation' },
+  { key: 'bookings', label: 'ჯავშნები', route: '/bookings' },
+  { key: 'parts', label: 'ნაწილების მოთხოვნები', route: '/parts-requests' },
+  { key: 'exclusive-fuel', label: 'საწვავის სპეციალური შეთავაზება', route: '/exclusive-fuel-offer' },
+] as const;
 const NOTIFICATION_TYPES: NotificationTypeConfig[] = [
   { type: 'general', label: 'General', screen: 'Notifications', icon: '📢', description: 'ზოგადი შეტყობინება' },
   { type: 'review', label: 'Review Us', screen: 'Review', icon: '⭐', description: 'გადავა Review სქრინზე' },
@@ -219,22 +196,13 @@ const NOTIFICATION_TYPES: NotificationTypeConfig[] = [
   },
 ];
 
-const formatDate = (d?: string) =>
-  d
-    ? new Date(d).toLocaleString('ka-GE', { timeZone: 'Asia/Tbilisi', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-    : '—';
-
 export default function PushNotificationsPage() {
-  /** Consent state */
-  const [consentData, setConsentData] = useState<ConsentResponse | null>(null);
-  const [consentLoading, setConsentLoading] = useState(true);
-  const [consentError, setConsentError] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<ConsentStatus | 'all'>('all');
-  const [search, setSearch] = useState('');
-
   /** Broadcast state */
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [destinationRoute, setDestinationRoute] = useState('');
+  const [destinationParams, setDestinationParams] = useState('');
+  const [destinationScreen, setDestinationScreen] = useState('');
   const [notificationType, setNotificationType] = useState<NotificationType>('general');
   const [sendToType, setSendToType] = useState<SendToType>('active');
   const [role, setRole] = useState('');
@@ -249,8 +217,6 @@ export default function PushNotificationsPage() {
   const [userSearchResults, setUserSearchResults] = useState<User[]>([]);
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
-  const [resolvedUsers, setResolvedUsers] = useState<Record<string, ResolvedUserRow>>({});
-  const [resolvingUsers, setResolvingUsers] = useState(false);
   const [finesUserId, setFinesUserId] = useState('');
   const [finesLoading, setFinesLoading] = useState(false);
   const [finesCache, setFinesCache] = useState<FinesCacheSummary | null>(null);
@@ -271,65 +237,6 @@ export default function PushNotificationsPage() {
 
   const isCommunityKind = (t: NotificationType): t is CommunityPushKind =>
     Object.prototype.hasOwnProperty.call(COMMUNITY_PUSH_META, t);
-
-  /** Load consent data */
-  const loadConsent = useCallback(async () => {
-    try {
-      setConsentLoading(true);
-      setConsentError(null);
-      const res = await apiGetJson<{ success: boolean; data: ConsentResponse }>('/notifications/consent/analytics');
-      if (res.success && res.data) setConsentData(res.data);
-      else setConsentError('მონაცემები ვერ ჩაიტვირთა');
-    } catch (e: any) {
-      setConsentError(e?.message || 'შეცდომა');
-    } finally {
-      setConsentLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadConsent();
-  }, [loadConsent]);
-
-  /** consent-ის userId → /users — სახელი/ტელეფონი ცხრილში */
-  useEffect(() => {
-    if (!consentData?.items?.length) return;
-    const ids = consentData.items.map((i) => i.userId).filter(Boolean);
-    setResolvedUsers({});
-    let cancelled = false;
-    setResolvingUsers(true);
-    (async () => {
-      await resolveUsersInParallel(ids, 6, (id, row) => {
-        if (cancelled || !row) return;
-        setResolvedUsers((prev) => ({ ...prev, [id]: row }));
-      });
-      if (!cancelled) setResolvingUsers(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [consentData]);
-
-  const filteredConsent = useMemo(() => {
-    if (!consentData) return [];
-    return consentData.items.filter((item) => {
-      const matchesStatus = statusFilter === 'all' ? true : item.status === statusFilter;
-      const q = search.trim().toLowerCase();
-      const r = resolvedUsers[item.userId];
-      const rName = r ? resolvedDisplayName(r).toLowerCase() : '';
-      const rPhone = (r?.phone || '').toLowerCase();
-      const rEmail = (r?.email || '').toLowerCase();
-      const matchesSearch =
-        !q ||
-        item.userId.toLowerCase().includes(q) ||
-        (item.phone && item.phone.toLowerCase().includes(q)) ||
-        (item.name && item.name.toLowerCase().includes(q)) ||
-        rName.includes(q) ||
-        rPhone.includes(q) ||
-        rEmail.includes(q);
-      return matchesStatus && matchesSearch;
-    });
-  }, [consentData, statusFilter, search, resolvedUsers]);
 
   /** Load user stats */
   const loadUserStats = useCallback(async () => {
@@ -438,6 +345,27 @@ export default function PushNotificationsPage() {
       return;
     }
 
+    let parsedDestinationParams: Record<string, string> = {};
+    if (destinationParams.trim()) {
+      try {
+        const parsed = JSON.parse(destinationParams);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid');
+        parsedDestinationParams = Object.fromEntries(
+          Object.entries(parsed).map(([key, value]) => [key, String(value)]),
+        );
+      } catch {
+        alert('Destination params უნდა იყოს სწორი JSON ობიექტი');
+        return;
+      }
+    }
+
+    let resolvedDestinationRoute = destinationRoute.trim();
+    resolvedDestinationRoute = resolvedDestinationRoute.replace(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g, (_match, key: string) => parsedDestinationParams[key] || '');
+    if (resolvedDestinationRoute.includes('{') || (resolvedDestinationRoute !== '/' && resolvedDestinationRoute.endsWith('/'))) {
+      alert('არჩეულ screen-ს სჭირდება შესაბამისი ID params-ში');
+      return;
+    }
+
     const targetCount = getTargetCount();
     let confirmMessage = `ნამდვილად გსურთ გაგზავნა?\n\nTitle: ${title}\nBody: ${body}\n\n`;
     if (sendToType === 'role') confirmMessage += `მიმღები: Role "${role}"${activeOnly ? ' (მხოლოდ active)' : ''} (${targetCount} მომხმარებელი)`;
@@ -469,6 +397,12 @@ export default function PushNotificationsPage() {
             screen: typeConfig.screen,
             timestamp: new Date().toISOString(),
           };
+      if (resolvedDestinationRoute) {
+        (baseData as Record<string, unknown>).route = resolvedDestinationRoute;
+      }
+      if (Object.keys(parsedDestinationParams).length > 0) {
+        (baseData as Record<string, unknown>).params = parsedDestinationParams;
+      }
       const requestBody: any = {
         title: title.trim(),
         body: body.trim(),
@@ -499,6 +433,9 @@ export default function PushNotificationsPage() {
 
       setTitle('');
       setBody('');
+      setDestinationRoute('');
+      setDestinationParams('');
+      setDestinationScreen('');
       setNotificationType('general');
       setSendToType('active');
       setRole('');
@@ -689,146 +626,9 @@ export default function PushNotificationsPage() {
     }
   };
 
-  /** Render helpers */
-  const SummaryCard = ({ label, value, color }: { label: string; value: number; color: string }) => (
-    <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
-      <div className="text-sm text-gray-600">{label}</div>
-      <div className={`text-2xl font-bold ${color}`}>{value.toLocaleString()}</div>
-    </div>
-  );
-
   /** UI */
   return (
     <div className="p-6 space-y-10">
-      {/* Consent Section */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Push ნებართვები (consent)</h1>
-            <p className="text-gray-600 mt-1">
-              ვინ ჩართო/დაბლოკა/უარი თქვა. წყარო: /notifications/consent, /notifications/register-device.
-            </p>
-          </div>
-          <button onClick={loadConsent} className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm">
-            განახლება
-          </button>
-        </div>
-
-        {consentLoading ? (
-          <div className="text-gray-600">იტვირთება...</div>
-        ) : consentError || !consentData ? (
-          <div className="space-y-2">
-            <p className="text-red-600">{consentError || 'მონაცემები არ არის'}</p>
-            <button onClick={loadConsent} className="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm">
-              განახლება
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              <SummaryCard label="სულ იუზერი" value={consentData.summary.totalUsers} color="text-gray-900" />
-              <SummaryCard label="სულ მოწყობილობა" value={consentData.summary.totalDevices} color="text-gray-900" />
-              <SummaryCard label="ჩართული" value={consentData.summary.granted} color="text-emerald-600" />
-              <SummaryCard label="დაბლოკილი (OS)" value={consentData.summary.blocked} color="text-amber-600" />
-              <SummaryCard label="უარი" value={consentData.summary.denied} color="text-rose-600" />
-              <SummaryCard label="snoozed/never" value={consentData.summary.snoozed + consentData.summary.never} color="text-gray-600" />
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
-              <div className="flex flex-wrap items-center gap-3 mb-4">
-                <div className="flex gap-2 flex-wrap">
-                  {STATUS_FILTERS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setStatusFilter(opt.value as ConsentStatus | 'all')}
-                      className={`px-3 py-1.5 rounded-lg border text-sm ${
-                        statusFilter === opt.value ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex-1 min-w-[200px]">
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="ძებნა userId/ტელ/სახელი..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-                <div className="text-sm text-gray-600 flex items-center gap-2 flex-wrap">
-                  <span>ნაჩვენებია {filteredConsent.length} ჩანაწერი</span>
-                  {resolvingUsers ? (
-                    <span className="text-blue-600 text-xs">იუზერების მონაცემები იტვირთება…</span>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-gray-600 text-left">
-                      <th className="py-2 pr-4">სტატუსი</th>
-                      <th className="py-2 pr-4">userId</th>
-                      <th className="py-2 pr-4">ტელ.</th>
-                      <th className="py-2 pr-4">სახელი</th>
-                      <th className="py-2 pr-4">როლი (API)</th>
-                      <th className="py-2 pr-4">პლატფორმა</th>
-                      <th className="py-2 pr-4">მოწყობილობა</th>
-                      <th className="py-2 pr-4">აპ ვერსია</th>
-                      <th className="py-2 pr-4">ბოლო განახლება</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredConsent.length === 0 && (
-                      <tr>
-                        <td className="py-3 text-center text-gray-500" colSpan={9}>
-                          ჩანაწერები ვერ მოიძებნა
-                        </td>
-                      </tr>
-                    )}
-                    {filteredConsent.map((item) => (
-                      <tr key={`${item.userId}-${item.tokenPrefix ?? item.updatedAt}`} className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2 pr-4">
-                          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${STATUS_COLORS[item.status]}`}>{STATUS_LABELS[item.status]}</span>
-                        </td>
-                        <td className="py-2 pr-4 font-mono text-xs max-w-[200px]">
-                          <div className="break-all">{item.userId}</div>
-                        </td>
-                        <td className="py-2 pr-4">
-                          {item.phone || resolvedUsers[item.userId]?.phone || (
-                            <span className="text-gray-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-2 pr-4">
-                          {item.name ||
-                            resolvedDisplayName(resolvedUsers[item.userId] || {}) ||
-                            (resolvingUsers && !resolvedUsers[item.userId] ? (
-                              <span className="text-gray-400 text-xs">იტვირთება…</span>
-                            ) : (
-                              '—'
-                            ))}
-                        </td>
-                        <td className="py-2 pr-4 text-xs text-gray-700">{resolvedUsers[item.userId]?.role || '—'}</td>
-                        <td className="py-2 pr-4">{item.platform || '—'}</td>
-                        <td className="py-2 pr-4 text-gray-700">
-                          {item.deviceName || item.modelName || '—'}
-                          {item.tokenPrefix ? <span className="ml-2 text-xs text-gray-400">({item.tokenPrefix}…)</span> : null}
-                        </td>
-                        <td className="py-2 pr-4">{item.appVersion || '—'}</td>
-                        <td className="py-2 pr-4 text-gray-600">{formatDate(item.updatedAt)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-      </section>
-
       {/* Fines cache + manual trigger */}
       <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow space-y-4">
         <div>
@@ -1073,6 +873,42 @@ export default function PushNotificationsPage() {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-800 dark:bg-indigo-900/20">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-100">📍 დაჭერის შემდეგ სად შევიდეს?</p>
+                <p className="mt-1 text-xs text-indigo-700/80 dark:text-indigo-300/80">მაგ: /offers/123 — მომხმარებელი პირდაპირ ამ შეთავაზებაზე გადავა.</p>
+              </div>
+              <span className="rounded-full bg-white/70 px-2 py-1 text-[10px] text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300">აპის route</span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <select
+                value={destinationScreen}
+                onChange={(e) => {
+                  const selected = MOBILE_DESTINATIONS.find((item) => item.key === e.target.value);
+                  setDestinationScreen(e.target.value);
+                  setDestinationRoute(selected?.route || '');
+                }}
+                className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm dark:border-indigo-700 dark:bg-gray-800"
+                disabled={sending}
+              >
+                <option value="">არჩეული Notification Type-ის screen</option>
+                {MOBILE_DESTINATIONS.map((item) => (
+                  <option key={item.key} value={item.key}>{item.label} · {item.route}</option>
+                ))}
+              </select>
+              <input
+                value={destinationParams}
+                onChange={(e) => setDestinationParams(e.target.value)}
+                placeholder={'params JSON: {"offerId":"123"}'}
+                className="rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm font-mono dark:border-indigo-700 dark:bg-gray-800"
+                disabled={sending}
+              />
+            </div>
+            {destinationRoute && <div className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-950/30 dark:text-indigo-200">არჩეული route: <code className="font-mono">{destinationRoute}</code></div>}
+            <p className="mt-2 text-[11px] text-indigo-700/70 dark:text-indigo-300/70">ცარიელი დატოვების შემთხვევაში იმუშავებს არჩეული Notification Type-ის ძველი navigation.</p>
           </div>
 
           <div>

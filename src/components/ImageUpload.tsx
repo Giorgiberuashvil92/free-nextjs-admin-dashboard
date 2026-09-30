@@ -2,9 +2,27 @@
 
 import { useState, useRef, useCallback } from "react";
 
-const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || "dtj9xx4qu";
-const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "carxapp";
-const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+function resolveUploadBackendUrl(): string {
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "[::1]" ||
+      host === "::1"
+    ) {
+      // ლოკალური marte-backend (PORT=3002) — production-ზე uploads შეიძლება ჯერ არ იყოს
+      return (
+        process.env.NEXT_PUBLIC_LOCAL_BACKEND_URL || "http://127.0.0.1:3002"
+      );
+    }
+  }
+  return (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "https://marte-backend-production.up.railway.app"
+  );
+}
 
 interface ImageUploadProps {
   value: string[];
@@ -26,29 +44,30 @@ export default function ImageUpload({
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadToCloudinary = async (file: File): Promise<string | null> => {
+  const uploadToR2 = async (file: File): Promise<string | null> => {
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
     if (folder) {
       formData.append("folder", folder);
     }
-    formData.append("tags", "carappx,admin,web_upload");
 
     try {
-      const response = await fetch(CLOUDINARY_UPLOAD_URL, {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        `${resolveUploadBackendUrl()}/uploads/images`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
       if (!response.ok) {
         throw new Error(`Upload failed: ${response.statusText}`);
       }
 
       const result = await response.json();
-      return result.secure_url || null;
+      return result?.data?.url || result?.url || result?.secure_url || null;
     } catch (error) {
-      console.error("Cloudinary upload error:", error);
+      console.error("R2 upload error:", error);
       return null;
     }
   };
@@ -71,7 +90,7 @@ export default function ImageUpload({
 
     for (let i = 0; i < filesToUpload.length; i++) {
       setUploadProgress(`ატვირთვა ${i + 1}/${filesToUpload.length}...`);
-      const url = await uploadToCloudinary(filesToUpload[i]);
+      const url = await uploadToR2(filesToUpload[i]);
       if (url) {
         uploadedUrls.push(url);
       }
@@ -132,7 +151,7 @@ export default function ImageUpload({
 
       for (let i = 0; i < filesToUpload.length; i++) {
         setUploadProgress(`ატვირთვა ${i + 1}/${filesToUpload.length}...`);
-        const url = await uploadToCloudinary(filesToUpload[i]);
+        const url = await uploadToR2(filesToUpload[i]);
         if (url) {
           uploadedUrls.push(url);
         }
@@ -211,5 +230,4 @@ export default function ImageUpload({
     </div>
   );
 }
-
 

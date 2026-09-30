@@ -86,6 +86,7 @@ const navItems: NavItem[] = [
       { name: "Ecommerce Shop", path: "/ecommerce-products" },
       { name: "მიტანის პროდუქტები", path: "/delivery-products" },
       { name: "მიტანის მოთხოვნები", path: "/delivery-leads" },
+      { name: "ნაწილების მოთხოვნები", path: "/part-leads" },
       { name: "დაზღვევის მოთხოვნები", path: "/insurance-leads" },
       { name: "ექსკლუზიური შეთავაზება", path: "/exclusive-offer-requests" },
       { name: "ქეშბექის ინვოისები", path: "/cashback" },
@@ -125,6 +126,8 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "SMS მარკეტინგი", path: "/sms-marketing" },
       { name: "Push Notifications", path: "/push-notifications" },
+      { name: "Mobile Screens", path: "/mobile-screens" },
+      { name: "მომხმარებლის შეფასებები", path: "/reviews" },
     ],
   },
   {
@@ -141,7 +144,6 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "მოთხოვნები", path: "/requests" },
       { name: "საპორტის ჩატი", path: "/support-chat" },
-      { name: "ფიდბექები", path: "/feedback" },
       { name: "ჯანმრთელობა", path: "/health" },
     ],
   },
@@ -314,13 +316,14 @@ const AppSidebar: React.FC = () => {
     if (effectiveOpenSubmenu !== null) {
       const key = `${effectiveOpenSubmenu.type}-${effectiveOpenSubmenu.index}`;
       if (subMenuRefs.current[key]) {
-        setSubMenuHeight((prevHeights) => ({
-          ...prevHeights,
-          [key]: subMenuRefs.current[key]?.scrollHeight || 0,
-        }));
+        const height = subMenuRefs.current[key]?.scrollHeight || 0;
+        setSubMenuHeight((prevHeights) => {
+          if (prevHeights[key] === height) return prevHeights;
+          return { ...prevHeights, [key]: height };
+        });
       }
     }
-  }, [effectiveOpenSubmenu]);
+  }, [effectiveOpenSubmenu?.type, effectiveOpenSubmenu?.index]);
 
   const handleSubmenuToggle = (index: number, menuType: "main" | "others") => {
     setOpenSubmenu((prevOpenSubmenu) => {

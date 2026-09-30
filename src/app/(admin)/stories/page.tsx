@@ -122,10 +122,10 @@ export default function AdminStoriesPage() {
   }, [loadingViewers, viewersMap, loadUserInfo]);
 
   const handleDelete = async (id: string) => {
-    if (!confirm(`დარწმუნებული ხართ რომ გსურთ ამ სთორის წაშლა? (ID: ${id})`)) return;
+    if (!confirm(`დარწმუნებული ხართ რომ გსურთ ამ სთორის წაშლა?`)) return;
     try {
-      await apiDelete(`/stories/${id}`);
-      await load(); // refresh list
+      await apiDelete(`/stories/${encodeURIComponent(id)}?admin=1`);
+      await load();
     } catch (e: unknown) {
       const message = e && typeof e === 'object' && 'message' in e ? String((e as { message?: unknown }).message) : 'Delete failed';
       alert(`წაშლა ვერ მოხერხდა: ${message}`);
@@ -221,7 +221,7 @@ export default function AdminStoriesPage() {
                       </span>
                     </div>
                     <div className="text-xs text-gray-500">
-                      ID: <a className="text-blue-600 underline" href={`/stories/${s.id}`} target="_blank" rel="noopener noreferrer">{s.id.slice(0, 8)}...</a>
+                      ID: <span className="font-mono">{s.id.slice(0, 12)}…</span>
                     </div>
                   </div>
 
@@ -295,14 +295,12 @@ export default function AdminStoriesPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center justify-between pt-2 border-t">
+                  <div className="flex items-center justify-between pt-2 border-t gap-2">
                     <a 
-                      className="text-sm px-3 py-1.5 border rounded hover:bg-gray-50" 
+                      className="text-sm px-3 py-1.5 border rounded hover:bg-gray-50 flex-1 text-center" 
                       href={`/stories/${s.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
                     >
-                      გახსნა
+                      რედაქტირება
                     </a>
                   <button
                     onClick={() => handleDelete(s.id)}

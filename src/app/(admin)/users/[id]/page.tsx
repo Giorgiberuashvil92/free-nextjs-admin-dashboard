@@ -70,6 +70,7 @@ export default function UserDetailPage() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editForm, setEditForm] = useState<Partial<UserDetail>>({});
 
   useEffect(() => {
@@ -204,6 +205,32 @@ export default function UserDetailPage() {
 
   const userName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.phone || 'User';
 
+  const handleDeleteUser = async () => {
+    const confirmed = window.confirm(
+      `ნამდვილად გსურთ მომხმარებლის წაშლა?\n\n${userName}\n${user.id || id}\n\nეს მოქმედება შეუქცევადია.`,
+    );
+    if (!confirmed || deleting) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`${API_BASE}/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json?.success === false) {
+        throw new Error(json?.message || json?.error || `HTTP ${res.status}`);
+      }
+      window.alert('✅ მომხმარებელი წარმატებით წაიშალა');
+      router.push('/users');
+    } catch (e) {
+      console.error('Error deleting user:', e);
+      window.alert(`❌ მომხმარებლის წაშლა ვერ მოხერხდა: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -255,6 +282,13 @@ export default function UserDetailPage() {
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
               >
                 ✏️ რედაქტირება
+              </button>
+              <button
+                onClick={() => void handleDeleteUser()}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-red-600 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 hover:bg-red-600 hover:text-white rounded-lg transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'იშლება…' : '🗑️ მომხმარებლის წაშლა'}
               </button>
             </>
           ) : (

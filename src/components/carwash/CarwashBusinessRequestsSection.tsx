@@ -77,7 +77,7 @@ export default function CarwashBusinessRequestsSection({ onCreateFromRequest }: 
     setLoading(true);
     setError("");
     try {
-      const res = await apiGetJson<FeedbackResponse>("/feedback?limit=200&offset=0");
+      const res = await apiGetJson<FeedbackResponse>("/reviews?limit=200&offset=0&source=carwash_business");
       const list = (res.data ?? [])
         .map((item) => ({
           ...item,

@@ -79,6 +79,43 @@ interface UpcomingPayment {
   rejectReason?: string;
 }
 
+function SubscriptionsModernView(props: any) {
+  const [selected, setSelected] = useState<Subscription | null>(null);
+  const [query, setQuery] = useState('');
+  const {
+    subscriptions, stats, upcomingPayments, loadingUpcoming, fetchUpcomingPayments,
+    processingRecurring, handleProcessRecurringPayments, recurringResult, exportToCSV,
+    fetchSubscriptionPayments, subscriptionPayments, loadingPayments,
+    handleDeleteSubscription, deletingSubscriptionId, rejectedPaymentsMap,
+    getStatusBadge, formatDate, formatDateTime,
+  } = props;
+  const filtered = subscriptions.filter((s: Subscription) => {
+    const value = `${s.userId} ${s.planName} ${s.status} ${s.orderId || ''}`.toLowerCase();
+    return value.includes(query.toLowerCase());
+  });
+  const openSubscription = (s: Subscription) => {
+    setSelected(s);
+    fetchSubscriptionPayments(s);
+  };
+
+  return <div className="space-y-5 text-gray-900 dark:text-gray-100">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-medium uppercase tracking-[0.18em] text-indigo-500">MARTE BILLING</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">გამოწერები</h1><p className="mt-1 text-sm text-gray-500">პაკეტები, გადახდები და recurring billing ერთ სივრცეში</p></div><div className="flex gap-2"><button onClick={exportToCSV} disabled={!subscriptions.length} className="rounded-xl border px-4 py-2.5 text-sm hover:bg-gray-50 disabled:opacity-40">CSV ექსპორტი</button><button onClick={props.refresh} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700">განახლება</button></div></div>
+    {props.error && <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{props.error}</div>}
+
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-5"><div className="rounded-2xl border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"><p className="text-xs text-gray-500">სულ</p><p className="mt-2 text-2xl font-semibold">{stats.total}</p></div><div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm"><p className="text-xs text-emerald-700">აქტიური</p><p className="mt-2 text-2xl font-semibold text-emerald-700">{stats.active}</p></div><div className="rounded-2xl border border-red-100 bg-red-50/70 p-4 shadow-sm"><p className="text-xs text-red-700">გაუქმებული</p><p className="mt-2 text-2xl font-semibold text-red-700">{stats.cancelled}</p></div><div className="rounded-2xl border bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"><p className="text-xs text-gray-500">ვადა გასული</p><p className="mt-2 text-2xl font-semibold">{stats.expired}</p></div><div className="col-span-2 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4 shadow-sm lg:col-span-1"><p className="text-xs text-indigo-700">შემოსავალი</p><p className="mt-2 text-2xl font-semibold text-indigo-700">{stats.totalRevenue.toFixed(2)}₾</p></div></div>
+
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"><div className="flex flex-wrap items-end justify-between gap-3"><label className="min-w-[260px] flex-1 text-xs font-medium text-gray-500">ძებნა<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="User ID, პაკეტი, სტატუსი ან Order ID" className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 dark:border-gray-700 dark:bg-gray-900" /></label><div className="flex gap-2 text-xs text-gray-500"><span className="rounded-full bg-gray-100 px-3 py-2 dark:bg-gray-700">{filtered.length} გამოწერა</span><span className="rounded-full bg-amber-50 px-3 py-2 text-amber-700">{upcomingPayments.length} მოსალოდნელი გადახდა</span></div></div></div>
+
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-800"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Recurring billing</h2><p className="mt-1 text-xs text-gray-500">მომწიფებული და დაგეგმილი გადახდების დამუშავება</p></div><button onClick={handleProcessRecurringPayments} disabled={processingRecurring} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">{processingRecurring ? 'მუშავდება…' : 'გადახდების დამუშავება'}</button></div>{recurringResult && <div className={`mt-4 rounded-xl border p-3 text-sm ${recurringResult.success ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>{recurringResult.message}{recurringResult.data ? ` · სულ ${recurringResult.data.total}, წარმატებული ${recurringResult.data.success}, წარუმატებელი ${recurringResult.data.failed}` : ''}</div>}</div>
+
+    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"><div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-700"><div><h2 className="font-semibold">მომავალი გადახდები</h2><p className="mt-1 text-xs text-gray-500">შემდეგი 7 დღე და გადაუხდელი recurring გადასახადები</p></div><button onClick={fetchUpcomingPayments} disabled={loadingUpcoming} className="text-sm text-indigo-600">{loadingUpcoming ? 'იტვირთება…' : 'განახლება'}</button></div>{upcomingPayments.length === 0 ? <p className="px-5 py-8 text-center text-sm text-gray-500">მომავალი გადახდები არ არის</p> : <div className="divide-y dark:divide-gray-700">{upcomingPayments.slice(0, 5).map((p: UpcomingPayment) => <div key={`${p.subscriptionId}-${p.nextBillingDate}`} className={`flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm ${p.isRejectedPayment ? 'bg-red-50/70' : ''}`}><div><p className="font-medium">{p.planName}</p><p className="text-xs text-gray-500">{p.userId} · {formatDate(p.nextBillingDate)}</p></div><div className="text-right"><p className="font-semibold">{p.amount} {p.currency}</p><span className={`text-xs ${p.isRejectedPayment ? 'text-red-600' : 'text-amber-600'}`}>{p.isRejectedPayment ? 'გადახდა უარყოფილია' : p.timeUntilBilling}</span></div></div>)}</div>}</div>
+
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800"><div className="border-b border-gray-100 px-5 py-4 dark:border-gray-700"><h2 className="font-semibold">ყველა გამოწერა</h2><p className="mt-1 text-xs text-gray-500">დააჭირე „გადახდები“-ს კონკრეტული მომხმარებლის ისტორიის სანახავად</p></div><div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-50/80 dark:bg-gray-900/40"><tr>{['მომხმარებელი','პაკეტი','თანხა','სტატუსი','შემდეგი გადახდა','გადახდილი','მოქმედება'].map((h) => <th key={h} className="px-5 py-3 text-left text-xs font-medium text-gray-500">{h}</th>)}</tr></thead><tbody>{filtered.map((s: Subscription) => { const rejected = rejectedPaymentsMap[s._id] || []; return <tr key={s._id} className={`border-t border-gray-100 hover:bg-indigo-50/30 dark:border-gray-700 ${rejected.length ? 'bg-red-50/50' : ''}`}><td className="px-5 py-3"><a className="font-mono text-xs text-indigo-600 hover:underline" href={`/users?q=${encodeURIComponent(s.userId)}`}>{s.userId}</a>{rejected.length > 0 && <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-[10px] text-red-700">{rejected.length} rejected</span>}</td><td className="px-5 py-3 font-medium">{s.planName}<span className="ml-2 text-xs font-normal text-gray-400">{s.period}</span></td><td className="px-5 py-3">{s.planPrice} {s.currency}</td><td className="px-5 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadge(s.status)}`}>{s.status}</span></td><td className="px-5 py-3 text-xs text-gray-500">{s.nextBillingDate ? formatDate(s.nextBillingDate) : '—'}</td><td className="px-5 py-3 font-medium">{(s.totalPaid || 0).toFixed(2)} {s.currency}<span className="block text-xs font-normal text-gray-400">{s.billingCycles || 0} ციკლი</span></td><td className="px-5 py-3"><div className="flex gap-2"><button onClick={() => openSubscription(s)} className="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs text-indigo-700 hover:bg-indigo-100">გადახდები</button><button onClick={() => void handleDeleteSubscription(s)} disabled={deletingSubscriptionId === s._id} className="rounded-lg px-2 py-1.5 text-xs text-red-600 hover:bg-red-50">{deletingSubscriptionId === s._id ? 'იშლება…' : 'წაშლა'}</button></div></td></tr>; })}{filtered.length === 0 && <tr><td colSpan={7} className="px-5 py-12 text-center text-sm text-gray-500">გამოწერები ვერ მოიძებნა</td></tr>}</tbody></table></div></div>
+
+    {selected && <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setSelected(null)}><aside className="absolute right-0 top-0 h-full w-full max-w-2xl overflow-y-auto bg-white p-6 shadow-2xl dark:bg-gray-800" onClick={(e) => e.stopPropagation()}><div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-widest text-indigo-500">Payment history</p><h2 className="mt-1 text-xl font-semibold">{selected.planName}</h2><a className="mt-1 block font-mono text-xs text-indigo-600" href={`/users?q=${encodeURIComponent(selected.userId)}`}>{selected.userId}</a></div><button className="text-xl text-gray-400" onClick={() => setSelected(null)}>×</button></div><div className="mt-5 grid grid-cols-3 gap-2"><div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900"><p className="text-xs text-gray-500">სტატუსი</p><p className="mt-1 text-sm font-medium">{selected.status}</p></div><div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900"><p className="text-xs text-gray-500">პაკეტის ფასი</p><p className="mt-1 text-sm font-medium">{selected.planPrice} {selected.currency}</p></div><div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900"><p className="text-xs text-gray-500">სულ გადახდილი</p><p className="mt-1 text-sm font-medium">{(selected.totalPaid || 0).toFixed(2)} {selected.currency}</p></div></div><div className="mt-6">{loadingPayments ? <p className="py-10 text-center text-sm text-gray-500">გადახდები იტვირთება…</p> : subscriptionPayments.length === 0 ? <p className="rounded-xl bg-gray-50 px-4 py-8 text-center text-sm text-gray-500 dark:bg-gray-900">გადახდების ისტორია არ მოიძებნა</p> : <div className="divide-y rounded-xl border dark:divide-gray-700">{subscriptionPayments.map((p: Payment) => { const rejectReason = p.codeDescription || p.code || p.metadata?.bogCallbackData?.reject_reason || p.metadata?.bogCallbackData?.order_status; return <div key={p._id} className="px-4 py-3"><div className="flex items-center justify-between gap-4"><div><p className="text-sm font-medium">{p.description || p.context || 'Subscription payment'}</p><p className="mt-1 text-xs text-gray-500">{formatDateTime(p.paymentDate || p.createdAt)}{p.paymentMethod ? ` · ${p.paymentMethod}` : ''}</p></div><div className="text-right"><p className="font-semibold">{p.amount} {p.currency}</p><span className={`text-xs ${p.status === 'completed' || p.status === 'success' ? 'text-emerald-600' : p.status === 'rejected' ? 'text-red-600' : 'text-amber-600'}`}>{p.status}</span></div></div>{p.status === 'rejected' && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"><span className="font-medium">რატომ არ ჩამოიჭრა:</span> {rejectReason || 'გადახდის სისტემა მიზეზს არ აბრუნებს'}</div>}</div>; })}</div>}</div></aside></div>}
+  </div>;
+}
+
 export default function SubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
@@ -523,6 +560,30 @@ export default function SubscriptionsPage() {
     );
   }
 
+  return <SubscriptionsModernView
+    subscriptions={subscriptions}
+    stats={stats}
+    upcomingPayments={upcomingPayments}
+    loadingUpcoming={loadingUpcoming}
+    fetchUpcomingPayments={fetchUpcomingPayments}
+    processingRecurring={processingRecurring}
+    handleProcessRecurringPayments={handleProcessRecurringPayments}
+    recurringResult={recurringResult}
+    exportToCSV={exportToCSV}
+    refresh={fetchSubscriptions}
+    error={error}
+    fetchSubscriptionPayments={fetchSubscriptionPayments}
+    subscriptionPayments={subscriptionPayments}
+    loadingPayments={loadingPayments}
+    handleDeleteSubscription={handleDeleteSubscription}
+    deletingSubscriptionId={deletingSubscriptionId}
+    rejectedPaymentsMap={rejectedPaymentsMap}
+    getStatusBadge={getStatusBadge}
+    formatDate={formatDate}
+    formatDateTime={formatDateTime}
+  />;
+
+  /* Legacy markup retained below temporarily while the new billing view is verified. */
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -584,34 +645,34 @@ export default function SubscriptionsPage() {
 
         {recurringResult && (
           <div className={`mt-4 p-4 rounded-lg ${
-            recurringResult.success
+            recurringResult!.success
               ? 'bg-green-50 border border-green-200'
               : 'bg-red-50 border border-red-200'
           }`}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-xl">
-                {recurringResult.success ? '✅' : '❌'}
+                {recurringResult!.success ? '✅' : '❌'}
               </span>
               <span className={`font-semibold ${
-                recurringResult.success ? 'text-green-800' : 'text-red-800'
+                recurringResult!.success ? 'text-green-800' : 'text-red-800'
               }`}>
-                {recurringResult.message}
+                {recurringResult!.message}
               </span>
             </div>
-            {recurringResult.data && (
+            {recurringResult!.data && (
               <div className="mt-2 text-sm text-gray-700">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <div className="text-gray-600">სულ</div>
-                    <div className="text-lg font-bold text-gray-900">{recurringResult.data.total}</div>
+                    <div className="text-lg font-bold text-gray-900">{recurringResult!.data!.total}</div>
                   </div>
                   <div>
                     <div className="text-gray-600">წარმატებული</div>
-                    <div className="text-lg font-bold text-green-600">{recurringResult.data.success}</div>
+                    <div className="text-lg font-bold text-green-600">{recurringResult!.data!.success}</div>
                   </div>
                   <div>
                     <div className="text-gray-600">წარუმატებელი</div>
-                    <div className="text-lg font-bold text-red-600">{recurringResult.data.failed}</div>
+                    <div className="text-lg font-bold text-red-600">{recurringResult!.data!.failed}</div>
                   </div>
                 </div>
               </div>
@@ -965,33 +1026,33 @@ export default function SubscriptionsPage() {
                     <p className="text-sm text-gray-600 break-all">
                       <span className="font-semibold">User ID:</span>{' '}
                       <a 
-                        href={`/users?q=${encodeURIComponent(selectedSubscription.userId)}`}
+                        href={`/users?q=${encodeURIComponent(selectedSubscription!.userId)}`}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-mono break-all"
-                        title={`View user: ${selectedSubscription.userId}`}
+                        title={`View user: ${selectedSubscription!.userId}`}
                       >
-                        {selectedSubscription.userId}
+                        {selectedSubscription!.userId}
                       </a>
                     </p>
                     <p className="text-sm text-gray-600">
-                      <span className="font-semibold">პლანი:</span> {selectedSubscription.planName} | <span className="font-semibold">პერიოდი:</span> {selectedSubscription.period}
+                      <span className="font-semibold">პლანი:</span> {selectedSubscription!.planName} | <span className="font-semibold">პერიოდი:</span> {selectedSubscription!.period}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <span className="font-semibold">დაწყება:</span> {formatDateTime(selectedSubscription.startDate)}
+                      <span className="font-semibold">დაწყება:</span> {formatDateTime(selectedSubscription!.startDate)}
                     </p>
-                    {selectedSubscription.endDate && (
+                    {selectedSubscription!.endDate && (
                       <p className="text-sm text-gray-600">
-                        <span className="font-semibold">დასრულება:</span> {formatDateTime(selectedSubscription.endDate)}
+                        <span className="font-semibold">დასრულება:</span> {formatDateTime(selectedSubscription!.endDate)}
                       </p>
                     )}
                     <p className="text-sm text-gray-600">
-                      <span className="font-semibold">შექმნა:</span> {formatDateTime(selectedSubscription.createdAt)}
+                      <span className="font-semibold">შექმნა:</span> {formatDateTime(selectedSubscription!.createdAt)}
                     </p>
                     <p className="text-sm text-gray-600">
-                      <span className="font-semibold">განახლება:</span> {formatDateTime(selectedSubscription.updatedAt)}
+                      <span className="font-semibold">განახლება:</span> {formatDateTime(selectedSubscription!.updatedAt)}
                     </p>
-                    {selectedSubscription.bogCardToken && (
+                    {selectedSubscription!.bogCardToken && (
                       <p className="text-sm text-gray-600">
-                        <span className="font-semibold">BOG Token:</span> <span className="font-mono text-xs">{selectedSubscription.bogCardToken.substring(0, 30)}...</span>
+                        <span className="font-semibold">BOG Token:</span> <span className="font-mono text-xs">{selectedSubscription!.bogCardToken!.substring(0, 30)}...</span>
                       </p>
                     )}
                   </div>
@@ -1138,4 +1199,3 @@ export default function SubscriptionsPage() {
     </div>
   );
 }
-

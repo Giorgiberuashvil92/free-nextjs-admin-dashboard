@@ -40,8 +40,69 @@ type UserRow = {
   ownedDismantlers?: string[];
 };
 
+function UsersModernView(props: any) {
+  const [detailUser, setDetailUser] = useState<UserRow | null>(null);
+  const {
+    rows, total, offset, limit, loading, err, q, setQ, role, setRole, active,
+    setActive, searchBy, setSearchBy, subscriptionPlan, setSubscriptionPlan, load, canPrev, canNext,
+    toggleRow, expandedRows, userSubscriptions, deviceTokensMap, userPayments,
+    userLoginHistory, loadingUserData, handleEdit, handleGrantPremium,
+    handleDelete, handleDeleteSubscription, editingUser, setEditingUser, editForm, setEditForm,
+    handleSaveEdit,
+  } = props;
+  const nameOf = (u: UserRow) => [u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone || 'უცნობი მომხმარებელი';
+  const subscriptionOf = (u: UserRow) => userSubscriptions[u.id] || Object.values(userSubscriptions).find((sub: any) => sub?.userId === u.id);
+  const premiumOf = (u: UserRow) => {
+    const sub = subscriptionOf(u);
+    return Boolean(sub?.status === 'active' && ((sub.planId || '').toLowerCase().includes('premium') || (sub.planName || '').toLowerCase().includes('premium')));
+  };
+  const openUser = (u: UserRow) => {
+    setDetailUser(u);
+    if (!expandedRows.has(u.id)) toggleRow(u.id);
+  };
+
+  return <div className="space-y-5 text-gray-900 dark:text-gray-100">
+    <div className="flex flex-wrap items-start justify-between gap-4">
+      <div><p className="text-xs font-medium uppercase tracking-[0.18em] text-indigo-500">MARTE CRM</p><h1 className="mt-1 text-2xl font-semibold tracking-tight">მომხმარებლები</h1><p className="mt-1 text-sm text-gray-500 dark:text-gray-400">მომხმარებლების, პაკეტებისა და მოწყობილობების მართვა</p></div>
+      <div className="flex items-center gap-2 text-sm text-gray-500"><span className="h-2 w-2 rounded-full bg-emerald-500" /> სინქრონიზებული მონაცემები</div>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800"><p className="text-xs text-gray-500">სულ მომხმარებლები</p><p className="mt-2 text-2xl font-semibold">{total}</p><p className="mt-1 text-xs text-gray-400">რეგისტრირებული ანგარიშები</p></div>
+      <div className="rounded-2xl border border-indigo-100 bg-indigo-50/70 p-4 shadow-sm dark:border-indigo-900 dark:bg-indigo-950/30"><p className="text-xs text-indigo-600">ამ გვერდზე</p><p className="mt-2 text-2xl font-semibold text-indigo-700">{rows.length}</p><p className="mt-1 text-xs text-indigo-500/80">ფილტრების მიხედვით</p></div>
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/30"><p className="text-xs text-emerald-700">Push მოწყობილობები</p><p className="mt-2 text-2xl font-semibold text-emerald-700">{rows.reduce((n: number, u: UserRow) => n + (u.deviceTokensCount || 0), 0)}</p><p className="mt-1 text-xs text-emerald-600/80">მომხმარებლების მოწყობილობები</p></div>
+    </div>
+
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="min-w-0 flex-1"><label className="mb-1 block text-xs font-medium text-gray-500">ძებნა</label><div className="flex gap-2"><select className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900" value={searchBy} onChange={(e) => setSearchBy(e.target.value)}><option value="name">სახელი</option><option value="phone">ტელეფონი</option><option value="email">Email</option><option value="personalId">პირადი ნომერი</option><option value="userId">User ID</option></select><input className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:bg-white dark:border-gray-700 dark:bg-gray-900" placeholder="ჩაწერე საძიებო ტექსტი" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+        <label className="text-xs font-medium text-gray-500">პაკეტი<select className="mt-1 block rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-normal dark:border-gray-700 dark:bg-gray-900" value={subscriptionPlan} onChange={(e) => setSubscriptionPlan(e.target.value)}><option value="">ყველა პაკეტი</option><option value="premium">Premium</option><option value="basic">Basic</option><option value="free">Free</option></select></label>
+        <label className="text-xs font-medium text-gray-500">სტატუსი<select className="mt-1 block rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-normal dark:border-gray-700 dark:bg-gray-900" value={active} onChange={(e) => setActive(e.target.value)}><option value="">ყველა</option><option value="true">აქტიური</option><option value="false">არააქტიური</option></select></label>
+        <label className="text-xs font-medium text-gray-500">როლი<select className="mt-1 block rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-normal dark:border-gray-700 dark:bg-gray-900" value={role} onChange={(e) => setRole(e.target.value)}><option value="">ყველა როლი</option><option value="customer">customer</option><option value="owner">owner</option><option value="manager">manager</option><option value="partner">partner</option></select></label>
+        <button className="rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50" onClick={() => { props.setOffset(0); load(); }} disabled={loading}>{loading ? 'იტვირთება…' : 'გაფილტვრა'}</button>
+      </div>{err && <p className="mt-3 text-sm text-red-600">{err}</p>}
+    </div>
+
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+      <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-700"><div><h2 className="font-semibold">მომხმარებლების სია</h2><p className="mt-0.5 text-xs text-gray-500">დეტალების სანახავად დააჭირე მომხმარებელს</p></div><span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-700">{rows.length} შედეგი</span></div>
+      <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-50/80 dark:bg-gray-900/40"><tr>{['მომხმარებელი','პაკეტი','როლი','მოწყობილობები','სტატუსი','მოქმედება'].map((h) => <th key={h} className="px-5 py-3 text-left text-xs font-medium text-gray-500">{h}</th>)}</tr></thead><tbody>
+        {rows.map((u: UserRow) => { const sub = subscriptionOf(u); const premium = premiumOf(u); return <tr key={u.id} className="border-t border-gray-100 transition hover:bg-indigo-50/30 dark:border-gray-700 dark:hover:bg-gray-900/40">
+          <td className="px-5 py-3"><button className="flex items-center gap-3 text-left" onClick={() => openUser(u)}><span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">{(u.firstName || u.phone || '?').slice(0, 1).toUpperCase()}</span><span><span className="block font-medium">{nameOf(u)}</span><span className="block text-xs text-gray-500">{u.phone}{u.email ? ` · ${u.email}` : ''}</span><span className="mt-0.5 block max-w-[220px] truncate font-mono text-[10px] text-gray-400" title={u.id}>userId: {u.id}</span></span></button></td>
+          <td className="px-5 py-3">{premium ? <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700">Premium</span> : sub?.status === 'active' ? <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600">{sub.planName || 'Basic'}</span> : <span className="text-xs text-gray-400">Free</span>}</td><td className="px-5 py-3 text-xs text-gray-500">{u.role || 'customer'}</td><td className="px-5 py-3 text-xs text-gray-500">{u.deviceTokensCount || 0} device</td><td className="px-5 py-3">{u.isActive ? <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />აქტიური</span> : <span className="text-xs text-gray-400">არააქტიური</span>}</td><td className="px-5 py-3 text-right"><button className="rounded-lg px-2.5 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50" onClick={() => openUser(u)}>ნახვა</button><button className="rounded-lg px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-100" onClick={() => handleEdit(u)}>რედაქტირება</button></td>
+        </tr>; })}{rows.length === 0 && <tr><td colSpan={6} className="px-5 py-16 text-center text-sm text-gray-500">{loading ? 'იტვირთება…' : 'მომხმარებლები ვერ მოიძებნა'}</td></tr>}
+      </tbody></table></div>
+      <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500"><span>{total ? offset + 1 : 0}–{Math.min(offset + limit, total)} / {total}</span><div className="flex gap-2"><button className="rounded-lg border px-3 py-1.5 disabled:opacity-40" disabled={!canPrev || loading} onClick={() => props.setOffset(Math.max(0, offset - limit))}>წინა</button><button className="rounded-lg border px-3 py-1.5 disabled:opacity-40" disabled={!canNext || loading} onClick={() => props.setOffset(offset + limit)}>შემდეგი</button></div></div>
+    </div>
+
+    {detailUser && <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setDetailUser(null)}><aside className="absolute right-0 top-0 h-full w-full max-w-md overflow-y-auto bg-white p-6 shadow-2xl dark:bg-gray-800" onClick={(e) => e.stopPropagation()}><div className="flex items-start justify-between"><div><p className="text-xs uppercase tracking-widest text-indigo-500">User profile</p><h2 className="mt-1 text-xl font-semibold">{nameOf(detailUser)}</h2><p className="mt-1 font-mono text-xs text-gray-400">userId: {detailUser.id}</p><p className="mt-1 text-sm text-gray-500">{detailUser.phone}</p></div><button className="text-xl text-gray-400" onClick={() => setDetailUser(null)}>×</button></div><div className="mt-6 grid grid-cols-2 gap-3"><div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900"><p className="text-xs text-gray-500">პაკეტი</p><p className="mt-1 font-medium">{premiumOf(detailUser) ? 'Premium' : subscriptionOf(detailUser)?.planName || 'Free'}</p></div><div className="rounded-xl bg-gray-50 p-3 dark:bg-gray-900"><p className="text-xs text-gray-500">სტატუსი</p><p className="mt-1 font-medium">{detailUser.isActive ? 'აქტიური' : 'არააქტიური'}</p></div></div><div className="mt-6 space-y-3 text-sm"><div className="flex justify-between border-b pb-3"><span className="text-gray-500">User ID</span><span className="max-w-[230px] truncate font-mono text-xs" title={detailUser.id}>{detailUser.id}</span></div><div className="flex justify-between border-b pb-3"><span className="text-gray-500">Email</span><span>{detailUser.email || '—'}</span></div><div className="flex justify-between border-b pb-3"><span className="text-gray-500">პირადი ნომერი</span><span>{detailUser.personalId || '—'}</span></div><div className="flex justify-between border-b pb-3"><span className="text-gray-500">მოწყობილობები</span><span>{detailUser.deviceTokensCount || 0}</span></div></div><div className="mt-6 space-y-2"><button className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700" onClick={() => handleGrantPremium(detailUser, subscriptionOf(detailUser))}>{premiumOf(detailUser) ? 'Premium-ის განახლება' : 'Premium-ის მინიჭება'}</button><button className="w-full rounded-xl border px-4 py-2.5 text-sm" onClick={() => handleEdit(detailUser)}>რედაქტირება</button><button className="w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50" onClick={() => handleDelete(detailUser.id, nameOf(detailUser))}>🗑️ მომხმარებლის წაშლა</button>{subscriptionOf(detailUser) && <button className="w-full rounded-xl border border-red-200 px-4 py-2.5 text-sm text-red-600" onClick={() => handleDeleteSubscription(detailUser.id, subscriptionOf(detailUser))}>Subscription-ის გაუქმება</button>}</div><div className="mt-8"><p className="mb-3 text-sm font-medium">აქტივობა</p>{loadingUserData[detailUser.id] ? <p className="text-sm text-gray-500">იტვირთება…</p> : <div className="space-y-2 text-sm text-gray-500"><p>გადახდები: {userPayments[detailUser.id]?.length || 0}</p><p>Login ჩანაწერები: {userLoginHistory[detailUser.id]?.length || 0}</p><p>Push devices: {deviceTokensMap[detailUser.id]?.length || detailUser.deviceTokensCount || 0}</p></div>}<div className="mt-5"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium text-gray-900 dark:text-gray-100">ბოლო გადახდები</p><span className="text-xs text-gray-400">{userPayments[detailUser.id]?.length || 0} ჩანაწერი</span></div>{userPayments[detailUser.id]?.length ? <div className="divide-y rounded-xl border border-gray-100 dark:border-gray-700">{userPayments[detailUser.id].slice(0, 5).map((payment: any, index: number) => <div key={payment._id || index} className="flex items-center justify-between gap-3 px-3 py-2.5 text-xs"><div><p className="font-medium text-gray-700 dark:text-gray-200">{payment.context || payment.paymentMethod || 'გადახდა'}</p><p className="mt-0.5 text-gray-400">{payment.paymentDate || payment.createdAt ? new Date(payment.paymentDate || payment.createdAt).toLocaleDateString('ka-GE') : 'თარიღი უცნობია'}</p></div><div className="text-right"><p className="font-semibold text-gray-800 dark:text-gray-100">{Number(payment.amount || 0).toFixed(2)}₾</p><span className={`text-[10px] ${payment.status === 'completed' ? 'text-emerald-600' : 'text-gray-400'}`}>{payment.status || 'უცნობი სტატუსი'}</span></div></div>)}</div> : <div className="rounded-xl bg-gray-50 px-3 py-4 text-xs text-gray-400 dark:bg-gray-900">გადახდები ჯერ არ არის</div>}</div></div></aside></div>}
+
+    {editingUser && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-800"><div className="flex items-center justify-between"><h2 className="text-lg font-semibold">მომხმარებლის რედაქტირება</h2><button className="text-xl text-gray-400" onClick={() => setEditingUser(null)}>×</button></div><div className="mt-5 space-y-4"><label className="block text-sm">პირადი ნომერი<input className="mt-1 w-full rounded-xl border px-3 py-2.5 dark:bg-gray-900" value={editForm.personalId} onChange={(e) => setEditForm({ ...editForm, personalId: e.target.value })} /></label><label className="block text-sm">როლი<select className="mt-1 w-full rounded-xl border px-3 py-2.5 dark:bg-gray-900" value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}><option value="customer">customer</option><option value="owner">owner</option><option value="manager">manager</option><option value="employee">employee</option><option value="partner">partner</option></select></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editForm.isActive} onChange={(e) => setEditForm({ ...editForm, isActive: e.target.checked })} /> აქტიური ანგარიში</label></div><div className="mt-6 flex gap-2"><button className="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white" onClick={handleSaveEdit} disabled={loading}>{loading ? 'ინახება…' : 'შენახვა'}</button><button className="flex-1 rounded-xl border px-4 py-2.5 text-sm" onClick={() => setEditingUser(null)}>გაუქმება</button></div></div></div>}
+  </div>;
+}
+
 export default function UsersPage() {
   const [q, setQ] = useState("");
+  const [searchBy, setSearchBy] = useState("name");
 
   /** ბმული /users?q=... (მაგ. რადარებიდან იუზერის ID-ზე) — load-მდე რომ მოხდეს q-ის დაყენება */
   useLayoutEffect(() => {
@@ -66,6 +127,7 @@ export default function UsersPage() {
   const [userLoginHistory, setUserLoginHistory] = useState<Record<string, any[]>>({});
   const [loadingUserData, setLoadingUserData] = useState<Record<string, boolean>>({});
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
+  const [detailUser, setDetailUser] = useState<UserRow | null>(null);
   const [editForm, setEditForm] = useState({ role: '', isActive: true, personalId: '' });
   const [platformStats, setPlatformStats] = useState<{
     totalUsers: number;
@@ -89,6 +151,7 @@ export default function UsersPage() {
     try {
       const params = new URLSearchParams();
       if (q) params.set("q", q);
+      if (q) params.set("searchBy", searchBy);
       if (role) params.set("role", role);
       if (active) params.set("active", active);
       params.set("limit", String(limit));
@@ -209,7 +272,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, role, active, limit, offset]);
+  }, [q, searchBy, role, active, limit, offset]);
 
   const handleDelete = async (userId: string, userName: string) => {
     if (!confirm(`ნამდვილად გსურთ ${userName || userId} user-ის წაშლა?`)) {
@@ -538,6 +601,46 @@ export default function UsersPage() {
     }
   });
 
+  return <UsersModernView
+    rows={filteredRows}
+    total={total}
+    offset={offset}
+    limit={limit}
+    loading={loading}
+    err={err}
+    q={q}
+    setQ={setQ}
+    searchBy={searchBy}
+    setSearchBy={setSearchBy}
+    role={role}
+    setRole={setRole}
+    active={active}
+    setActive={setActive}
+    subscriptionPlan={subscriptionPlan}
+    setSubscriptionPlan={setSubscriptionPlan}
+    load={load}
+    canPrev={canPrev}
+    canNext={canNext}
+    setOffset={setOffset}
+    toggleRow={toggleRow}
+    expandedRows={expandedRows}
+    userSubscriptions={userSubscriptions}
+    deviceTokensMap={deviceTokensMap}
+    userPayments={userPayments}
+    userLoginHistory={userLoginHistory}
+    loadingUserData={loadingUserData}
+    handleEdit={handleEdit}
+    handleGrantPremium={handleGrantPremium}
+    handleDelete={handleDelete}
+    handleDeleteSubscription={handleDeleteSubscription}
+    editingUser={editingUser}
+    setEditingUser={setEditingUser}
+    editForm={editForm}
+    setEditForm={setEditForm}
+    handleSaveEdit={handleSaveEdit}
+  />;
+
+  /* Legacy markup retained below temporarily while the new CRM view is verified. */
   return (
     <div className="space-y-6">
       {/* Platform Statistics */}
@@ -547,18 +650,18 @@ export default function UsersPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <div className="text-sm text-green-700 dark:text-green-400 mb-1">🤖 Android იუზერები</div>
-              <div className="text-2xl font-bold text-green-900 dark:text-green-300">{platformStats.androidUsers}</div>
-              <div className="text-xs text-green-600 dark:text-green-400 mt-1">{platformStats.androidDevices} მოწყობილობა</div>
+              <div className="text-2xl font-bold text-green-900 dark:text-green-300">{platformStats!.androidUsers}</div>
+              <div className="text-xs text-green-600 dark:text-green-400 mt-1">{platformStats!.androidDevices} მოწყობილობა</div>
             </div>
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <div className="text-sm text-blue-700 dark:text-blue-400 mb-1">🍎 iOS იუზერები</div>
-              <div className="text-2xl font-bold text-blue-900 dark:text-blue-300">{platformStats.iosUsers}</div>
-              <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">{platformStats.iosDevices} მოწყობილობა</div>
+              <div className="text-2xl font-bold text-blue-900 dark:text-blue-300">{platformStats!.iosUsers}</div>
+              <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">{platformStats!.iosDevices} მოწყობილობა</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
               <div className="text-sm text-gray-700 dark:text-gray-400 mb-1">👥 სულ იუზერები</div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-gray-200">{platformStats.totalUsers}</div>
-              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{platformStats.totalDevices} მოწყობილობა</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-gray-200">{platformStats!.totalUsers}</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{platformStats!.totalDevices} მოწყობილობა</div>
             </div>
           </div>
         </div>
@@ -743,7 +846,7 @@ export default function UsersPage() {
                   მომხმარებელი
                 </label>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {[editingUser.firstName, editingUser.lastName].filter(Boolean).join(' ') || editingUser.phone}
+                  {[editingUser!.firstName, editingUser!.lastName].filter(Boolean).join(' ') || editingUser!.phone}
                 </div>
               </div>
               <div>
@@ -1071,19 +1174,26 @@ export default function UsersPage() {
                       </div>
                     ) : '-'}
                   </td>
-                  <td className="px-3 py-2">
-                    <div className="flex gap-2">
+                  <td className="px-3 py-2 min-w-[170px]">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <a
+                        href={`/users/${u.id}`}
+                        className="whitespace-nowrap px-2 py-1 text-[11px] font-medium text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-600 rounded-md transition-colors"
+                        title="მომხმარებლის ნახვა"
+                      >
+                        👁️ ნახვა
+                      </a>
                       <button
                         onClick={() => handleEdit(u)}
-                        className="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-white hover:bg-blue-600 border border-blue-600 rounded-lg transition-colors"
+                        className="whitespace-nowrap px-2 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-200 hover:text-white hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md transition-colors"
                         title="Edit user"
                       >
-                        ✏️ რედაქტირება
+                        ✏️ რედ.
                       </button>
                       <button
                         onClick={() => handleDelete(u.id, [u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone)}
-                        className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-lg transition-colors"
-                        title="Delete user"
+                        className="whitespace-nowrap px-2 py-1 text-[11px] font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-600 rounded-md transition-colors"
+                        title="მომხმარებლის წაშლა"
                       >
                         🗑️ წაშლა
                       </button>
