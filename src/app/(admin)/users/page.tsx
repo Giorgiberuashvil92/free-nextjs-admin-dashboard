@@ -17,6 +17,8 @@ type DeviceTokenSummary = {
 type UserRow = {
   id: string;
   phone: string;
+  phoneNumber?: string;
+  mobile?: string;
   email?: string;
   firstName?: string;
   lastName?: string;
@@ -50,7 +52,8 @@ function UsersModernView(props: any) {
     handleDelete, handleDeleteSubscription, editingUser, setEditingUser, editForm, setEditForm,
     handleSaveEdit,
   } = props;
-  const nameOf = (u: UserRow) => [u.firstName, u.lastName].filter(Boolean).join(' ') || u.phone || 'უცნობი მომხმარებელი';
+  const phoneOf = (u: UserRow) => u.phone || u.phoneNumber || u.mobile || '—';
+  const nameOf = (u: UserRow) => [u.firstName, u.lastName].filter(Boolean).join(' ') || phoneOf(u) || 'უცნობი მომხმარებელი';
   const subscriptionOf = (u: UserRow) => userSubscriptions[u.id] || Object.values(userSubscriptions).find((sub: any) => sub?.userId === u.id);
   const premiumOf = (u: UserRow) => {
     const sub = subscriptionOf(u);
@@ -85,11 +88,12 @@ function UsersModernView(props: any) {
 
     <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 dark:border-gray-700"><div><h2 className="font-semibold">მომხმარებლების სია</h2><p className="mt-0.5 text-xs text-gray-500">დეტალების სანახავად დააჭირე მომხმარებელს</p></div><span className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500 dark:bg-gray-700">{rows.length} შედეგი</span></div>
-      <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-50/80 dark:bg-gray-900/40"><tr>{['მომხმარებელი','პაკეტი','როლი','მოწყობილობები','სტატუსი','მოქმედება'].map((h) => <th key={h} className="px-5 py-3 text-left text-xs font-medium text-gray-500">{h}</th>)}</tr></thead><tbody>
+      <div className="overflow-x-auto"><table className="min-w-full text-sm"><thead className="bg-gray-50/80 dark:bg-gray-900/40"><tr>{['მომხმარებელი','ტელეფონი','პაკეტი','როლი','მოწყობილობები','სტატუსი','მოქმედება'].map((h) => <th key={h} className="px-5 py-3 text-left text-xs font-medium text-gray-500">{h}</th>)}</tr></thead><tbody>
         {rows.map((u: UserRow) => { const sub = subscriptionOf(u); const premium = premiumOf(u); return <tr key={u.id} className="border-t border-gray-100 transition hover:bg-indigo-50/30 dark:border-gray-700 dark:hover:bg-gray-900/40">
-          <td className="px-5 py-3"><button className="flex items-center gap-3 text-left" onClick={() => openUser(u)}><span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">{(u.firstName || u.phone || '?').slice(0, 1).toUpperCase()}</span><span><span className="block font-medium">{nameOf(u)}</span><span className="block text-xs text-gray-500">{u.phone}{u.email ? ` · ${u.email}` : ''}</span><span className="mt-0.5 block max-w-[220px] truncate font-mono text-[10px] text-gray-400" title={u.id}>userId: {u.id}</span></span></button></td>
+          <td className="px-5 py-3"><button className="flex items-center gap-3 text-left" onClick={() => openUser(u)}><span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">{(u.firstName || phoneOf(u) || '?').slice(0, 1).toUpperCase()}</span><span><span className="block font-medium">{nameOf(u)}</span><span className="block text-xs text-gray-500">{phoneOf(u)}{u.email ? ` · ${u.email}` : ''}</span><span className="mt-0.5 block max-w-[220px] truncate font-mono text-[10px] text-gray-400" title={u.id}>userId: {u.id}</span></span></button></td>
+          <td className="whitespace-nowrap px-5 py-3 font-mono text-xs text-gray-600 dark:text-gray-300">{phoneOf(u)}</td>
           <td className="px-5 py-3">{premium ? <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-medium text-indigo-700">Premium</span> : sub?.status === 'active' ? <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs text-gray-600">{sub.planName || 'Basic'}</span> : <span className="text-xs text-gray-400">Free</span>}</td><td className="px-5 py-3 text-xs text-gray-500">{u.role || 'customer'}</td><td className="px-5 py-3 text-xs text-gray-500">{u.deviceTokensCount || 0} device</td><td className="px-5 py-3">{u.isActive ? <span className="inline-flex items-center gap-1.5 text-xs text-emerald-600"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />აქტიური</span> : <span className="text-xs text-gray-400">არააქტიური</span>}</td><td className="px-5 py-3 text-right"><button className="rounded-lg px-2.5 py-1.5 text-xs text-indigo-600 hover:bg-indigo-50" onClick={() => openUser(u)}>ნახვა</button><button className="rounded-lg px-2.5 py-1.5 text-xs text-gray-500 hover:bg-gray-100" onClick={() => handleEdit(u)}>რედაქტირება</button></td>
-        </tr>; })}{rows.length === 0 && <tr><td colSpan={6} className="px-5 py-16 text-center text-sm text-gray-500">{loading ? 'იტვირთება…' : 'მომხმარებლები ვერ მოიძებნა'}</td></tr>}
+        </tr>; })}{rows.length === 0 && <tr><td colSpan={7} className="px-5 py-16 text-center text-sm text-gray-500">{loading ? 'იტვირთება…' : 'მომხმარებლები ვერ მოიძებნა'}</td></tr>}
       </tbody></table></div>
       <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 text-xs text-gray-500"><span>{total ? offset + 1 : 0}–{Math.min(offset + limit, total)} / {total}</span><div className="flex gap-2"><button className="rounded-lg border px-3 py-1.5 disabled:opacity-40" disabled={!canPrev || loading} onClick={() => props.setOffset(Math.max(0, offset - limit))}>წინა</button><button className="rounded-lg border px-3 py-1.5 disabled:opacity-40" disabled={!canNext || loading} onClick={() => props.setOffset(offset + limit)}>შემდეგი</button></div></div>
     </div>
@@ -165,6 +169,7 @@ export default function UsersPage() {
         const validImageUrl = imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : undefined;
         return {
           ...user,
+          phone: user.phone || user.phoneNumber || user.mobile || '',
           avatar: validImageUrl,
           // Keep profileImage as well for direct access
           profileImage: user.profileImage && typeof user.profileImage === 'string' && user.profileImage.startsWith('http') ? user.profileImage : undefined
@@ -195,8 +200,26 @@ export default function UsersPage() {
 
       // Match subscriptions to users by userId
       const subscriptionsMap: Record<string, any> = {};
+      // API აბრუნებს ჩანაწერებს createdAt-ის კლებადობით, მაგრამ ერთ იუზერს
+      // შეიძლება რამდენიმე subscription ჰქონდეს. პირდაპირი overwrite-ისას
+      // ბოლოს ძველი Basic/Free ჩანაწერი რჩებოდა და ახლად მინიჭებულ Premium-ს
+      // ფარავდა. ავირჩიოთ ყველაზე ახალი განახლებული ჩანაწერი, active-ს კი
+      // უპირატესობა მივცეთ.
+      const subscriptionRank = (sub: any) => {
+        const timestamp = Date.parse(String(sub.updatedAt || sub.createdAt || ''));
+        return Number.isFinite(timestamp) ? timestamp : 0;
+      };
       allSubscriptions.forEach((sub: any) => {
-        if (sub.userId) {
+        if (!sub.userId) return;
+        const current = subscriptionsMap[sub.userId];
+        if (!current) {
+          subscriptionsMap[sub.userId] = sub;
+          return;
+        }
+        const currentActive = current.status === 'active';
+        const nextActive = sub.status === 'active';
+        if ((nextActive && !currentActive) ||
+            (nextActive === currentActive && subscriptionRank(sub) > subscriptionRank(current))) {
           subscriptionsMap[sub.userId] = sub;
         }
       });
@@ -360,7 +383,7 @@ export default function UsersPage() {
     try {
       const subscription = await apiPost<any>('/subscriptions/grant-premium', {
         userId: user.id,
-        phone: user.phone,
+        phone: user.phone || user.phoneNumber || user.mobile || undefined,
         period,
       });
 
