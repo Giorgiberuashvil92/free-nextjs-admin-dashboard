@@ -103,6 +103,7 @@ const navItems: NavItem[] = [
       { name: "გაქირავება", path: "/car-rentals" },
       { name: "მანქანის ბრენდები", path: "/car-brands" },
       { name: "საპატრულო ჯარიმები", path: "/fines-vehicles" },
+      { name: "მერიის ჯარიმები", path: "/municipal-fines" },
       { name: "CarFAX მოთხოვნები", path: "/carfax-users" },
       { name: "რადარები", path: "/radars" },
       { name: "EV დამუხტვა", path: "/ev-charging" },
