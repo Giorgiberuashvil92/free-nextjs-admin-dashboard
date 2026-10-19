@@ -145,6 +145,7 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "მოთხოვნები", path: "/requests" },
       { name: "საპორტის ჩატი", path: "/support-chat" },
+      { name: "ბაგები", path: "/bugs" },
       { name: "ჯანმრთელობა", path: "/health" },
     ],
   },
