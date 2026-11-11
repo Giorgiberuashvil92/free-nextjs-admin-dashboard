@@ -25,6 +25,7 @@ type UserRow = {
   personalId?: string; // idNumber from API
   role: string;
   isActive: boolean;
+  euroinsEligible?: boolean;
   createdAt?: number | string;
   updatedAt?: number | string;
   avatar?: string;
@@ -1034,7 +1035,17 @@ export default function UsersPage() {
                           </div>
                         </div>
                       )}
-                      <span className="font-medium">{[u.firstName, u.lastName].filter(Boolean).join(' ') || '-'}</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{[u.firstName, u.lastName].filter(Boolean).join(' ') || '-'}</span>
+                        {u.euroinsEligible === true && (
+                          <span
+                            className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200"
+                            title="EUROINS-ის პოლისით Premium-ის მიღების უფლება"
+                          >
+                            EUROINS
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">{u.personalId || '-'}</td>
