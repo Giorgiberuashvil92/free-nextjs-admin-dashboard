@@ -45,13 +45,12 @@ type UserRow = {
 
 export default function UsersPage() {
   const [q, setQ] = useState("");
-  const [searchBy, setSearchBy] = useState("name");
 
   /** ბმული /users?q=... (მაგ. რადარებიდან იუზერის ID-ზე) — load-მდე რომ მოხდეს q-ის დაყენება */
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;
     const v = new URLSearchParams(window.location.search).get("q");
-    if (v) setQ(decodeURIComponent(v.trim()));
+    if (v) setQ(v.trim());
   }, []);
   const [role, setRole] = useState("");
   const [active, setActive] = useState<string>("");
@@ -93,8 +92,10 @@ export default function UsersPage() {
     setLoading(true); setErr("");
     try {
       const params = new URLSearchParams();
-      if (q) params.set("q", q);
-      if (q) params.set("searchBy", searchBy);
+      if (q.trim()) {
+        params.set("q", q.trim());
+        params.set("searchBy", "all");
+      }
       if (role) params.set("role", role);
       if (active) params.set("active", active);
       params.set("limit", String(limit));
@@ -234,7 +235,7 @@ export default function UsersPage() {
     } finally {
       setLoading(false);
     }
-  }, [q, searchBy, role, active, limit, offset]);
+  }, [q, role, active, limit, offset]);
 
   const handleDelete = async (userId: string, userName: string) => {
     if (!confirm(`ნამდვილად გსურთ ${userName || userId} user-ის წაშლა?`)) {
@@ -834,7 +835,10 @@ export default function UsersPage() {
       <div className="flex items-end gap-3 flex-wrap">
         <div>
           <div className="text-sm text-gray-600">Search</div>
-          <input className="border rounded px-3 py-2 w-64" placeholder="phone, email, name, id" value={q} onChange={(e)=>setQ(e.target.value)} />
+          <input className="border rounded px-3 py-2 w-64" placeholder="სახელი, ტელეფონი, ელფოსტა ან User ID" value={q} onChange={(e) => {
+            setQ(e.target.value);
+            setOffset(0);
+          }} />
         </div>
         <div>
           <div className="text-sm text-gray-600">Role</div>
